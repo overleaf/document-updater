@@ -12,9 +12,9 @@ DocumentManager = require "./DocumentManager"
 RangesManager = require "./RangesManager"
 
 module.exports = UpdateManager =
-	processOutstandingUpdates: (project_id, doc_id, callback = (error) ->) ->
+	processOutstandingUpdates: (project_id, doc_id, lockValue, callback = (error) ->) ->
 		timer = new Metrics.Timer("updateManager.processOutstandingUpdates")
-		UpdateManager.fetchAndApplyUpdates project_id, doc_id, (error) ->
+		UpdateManager.fetchAndApplyUpdates project_id, doc_id, lockValue, (error) ->
 			timer.done()
 			return callback(error) if error?
 			callback()
@@ -23,7 +23,7 @@ module.exports = UpdateManager =
 		LockManager.tryLock doc_id, (error, gotLock, lockValue) =>
 			return callback(error) if error?
 			return callback() if !gotLock
-			UpdateManager.processOutstandingUpdates project_id, doc_id, (error) ->
+			UpdateManager.processOutstandingUpdates project_id, doc_id, lockValue, (error) ->
 				return UpdateManager._handleErrorInsideLock(doc_id, lockValue, error, callback) if error?
 				LockManager.releaseLock doc_id, lockValue, (error) =>
 					return callback(error) if error?
@@ -37,13 +37,15 @@ module.exports = UpdateManager =
 			else
 				callback()
 
-	fetchAndApplyUpdates: (project_id, doc_id, callback = (error) ->) ->
+	fetchAndApplyUpdates: (project_id, doc_id, lockValue, callback = (error) ->) ->
 		RealTimeRedisManager.getPendingUpdatesForDoc doc_id, (error, updates) =>
 			return callback(error) if error?
 			if updates.length == 0
 				return callback()
 			async.eachSeries updates,
-				(update, cb) -> UpdateManager.applyUpdate project_id, doc_id, update, cb
+				(update, cb) ->
+					LockManager.extendLock lockValue, (error) ->
+						UpdateManager.applyUpdate project_id, doc_id, update, cb
 				callback
 
 	applyUpdate: (project_id, doc_id, update, _callback = (error) ->) ->
