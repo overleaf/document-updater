@@ -45,6 +45,9 @@ module.exports = UpdateManager =
 			async.eachSeries updates,
 				(update, cb) ->
 					LockManager.extendLock lockValue, (error) ->
+						# if we fail to extend the lock we've probably overrun it
+						# so bail out here
+						return cb(error) if error?
 						UpdateManager.applyUpdate project_id, doc_id, update, cb
 				callback
 
