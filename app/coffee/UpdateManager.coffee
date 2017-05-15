@@ -14,7 +14,7 @@ RangesManager = require "./RangesManager"
 module.exports = UpdateManager =
 	processOutstandingUpdates: (project_id, doc_id, callback = (error) ->) ->
 		timer = new Metrics.Timer("updateManager.processOutstandingUpdates")
-		UpdateManager.fetchAndApplyUpdates project_id, doc_id, (error) ->
+		UpdateManager.fetchAndApplyUpdate project_id, doc_id, (error) ->
 			timer.done()
 			return callback(error) if error?
 			callback()
@@ -37,15 +37,13 @@ module.exports = UpdateManager =
 			else
 				callback()
 
-	fetchAndApplyUpdates: (project_id, doc_id, callback = (error) ->) ->
-		RealTimeRedisManager.getPendingUpdatesForDoc doc_id, (error, updates) =>
+	fetchAndApplyUpdate: (project_id, doc_id, callback = (error) ->) ->
+		RealTimeRedisManager.getNextPendingUpdateForDoc doc_id, (error, update) =>
 			return callback(error) if error?
-			logger.log {project_id: project_id, doc_id: doc_id, count: updates.length}, "processing updates"
-			if updates.length == 0
+			logger.log {project_id: project_id, doc_id: doc_id}, "processing updates"
+			if !update?  ## FIXME
 				return callback()
-			async.eachSeries updates,
-				(update, cb) -> UpdateManager.applyUpdate project_id, doc_id, update, cb
-				callback
+			UpdateManager.applyUpdate project_id, doc_id, update, callback
 
 	applyUpdate: (project_id, doc_id, update, _callback = (error) ->) ->
 		callback = (error) ->

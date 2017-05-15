@@ -25,44 +25,31 @@ describe "RealTimeRedisManager", ->
 	
 	describe "getPendingUpdatesForDoc", ->
 		beforeEach ->
-			@rclient.lrange = sinon.stub()
-			@rclient.ltrim = sinon.stub()
+			@rclient.lpop = sinon.stub()
 
 		describe "successfully", ->
 			beforeEach ->
-				@updates = [
-					{ op: [{ i: "foo", p: 4 }] }
-					{ op: [{ i: "foo", p: 4 }] }
-				]
-				@jsonUpdates = @updates.map (update) -> JSON.stringify update
-				@rclient.exec = sinon.stub().callsArgWith(0, null, [@jsonUpdates])
-				@RealTimeRedisManager.getPendingUpdatesForDoc @doc_id, @callback
+				@update =	{ op: [{ i: "foo", p: 4 }] }
+				@jsonUpdate = JSON.stringify @update
+				@rclient.lpop = sinon.stub().callsArgWith(1, null, @jsonUpdate)
+				@RealTimeRedisManager.getNextPendingUpdateForDoc @doc_id, @callback
 			
-			it "should get the pending updates", ->
-				@rclient.lrange
-					.calledWith("PendingUpdates:#{@doc_id}", 0, 7)
+			it "should pop the next pending update", ->
+				@rclient.lpop
+					.calledWith("PendingUpdates:#{@doc_id}")
 					.should.equal true
 
-			it "should delete the pending updates", ->
-				@rclient.ltrim
-					.calledWith("PendingUpdates:#{@doc_id}", 8, -1)
-					.should.equal true
-
-			it "should call the callback with the updates", ->
-				@callback.calledWith(null, @updates).should.equal true
+			it "should call the callback with the update", ->
+				@callback.calledWith(null, @update).should.equal true
 
 		describe "when the JSON doesn't parse", ->
 			beforeEach ->
-				@jsonUpdates = [
-					JSON.stringify { op: [{ i: "foo", p: 4 }] }
-					"broken json"
-				]
-				@rclient.exec = sinon.stub().callsArgWith(0, null, [@jsonUpdates])
-				@RealTimeRedisManager.getPendingUpdatesForDoc @doc_id, @callback
+				@jsonUpdate = "broken json"
+				@rclient.lpop = sinon.stub().callsArgWith(1, null, @jsonUpdate)
+				@RealTimeRedisManager.getNextPendingUpdateForDoc @doc_id, @callback
 
 			it "should return an error to the callback", ->
 				@callback.calledWith(new Error("JSON parse error")).should.equal true
-
 
 	describe "getUpdatesLength", ->
 		beforeEach ->

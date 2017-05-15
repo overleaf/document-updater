@@ -25,11 +25,11 @@ describe "UpdateManager", ->
 
 	describe "processOutstandingUpdates", ->
 		beforeEach ->
-			@UpdateManager.fetchAndApplyUpdates = sinon.stub().callsArg(2)
+			@UpdateManager.fetchAndApplyUpdate = sinon.stub().callsArg(2)
 			@UpdateManager.processOutstandingUpdates @project_id, @doc_id, @callback
 
 		it "should apply the updates", ->
-			@UpdateManager.fetchAndApplyUpdates.calledWith(@project_id, @doc_id).should.equal true
+			@UpdateManager.fetchAndApplyUpdate.calledWith(@project_id, @doc_id).should.equal true
 
 		it "should call the callback", ->
 			@callback.called.should.equal true
@@ -116,35 +116,33 @@ describe "UpdateManager", ->
 			it "should return the callback", ->
 				@callback.called.should.equal true
 
-	describe "fetchAndApplyUpdates", ->
+	describe "fetchAndApplyUpdate", ->
 		describe "with updates", ->
 			beforeEach ->
-				@updates = [{p: 1, t: "foo"}]
+				@update = {p: 1, t: "foo"}
 				@updatedDocLines = ["updated", "lines"]
 				@version = 34
-				@RealTimeRedisManager.getPendingUpdatesForDoc = sinon.stub().callsArgWith(1, null, @updates)
+				@RealTimeRedisManager.getNextPendingUpdateForDoc = sinon.stub().callsArgWith(1, null, @update)
 				@UpdateManager.applyUpdate = sinon.stub().callsArgWith(3, null, @updatedDocLines, @version)
-				@UpdateManager.fetchAndApplyUpdates @project_id, @doc_id, @callback
+				@UpdateManager.fetchAndApplyUpdate @project_id, @doc_id, @callback
 
-			it "should get the pending updates", ->
-				@RealTimeRedisManager.getPendingUpdatesForDoc.calledWith(@doc_id).should.equal true
+			it "should get the pending update", ->
+				@RealTimeRedisManager.getNextPendingUpdateForDoc.calledWith(@doc_id).should.equal true
 
-			it "should apply the updates", ->
-				for update in @updates
-					@UpdateManager.applyUpdate
-						.calledWith(@project_id, @doc_id, update)
-						.should.equal true
+			it "should apply the update", ->
+				@UpdateManager.applyUpdate
+					.calledWith(@project_id, @doc_id, @update)
+					.should.equal true
 		
 			it "should call the callback", ->
 				@callback.called.should.equal true
 
 		describe "when there are no updates", ->
 			beforeEach ->
-				@updates = []
-				@RealTimeRedisManager.getPendingUpdatesForDoc = sinon.stub().callsArgWith(1, null, @updates)
+				@RealTimeRedisManager.getNextPendingUpdateForDoc = sinon.stub().callsArg(1)
 				@UpdateManager.applyUpdate = sinon.stub()
 				@RedisManager.setDocument = sinon.stub()
-				@UpdateManager.fetchAndApplyUpdates @project_id, @doc_id, @callback
+				@UpdateManager.fetchAndApplyUpdate @project_id, @doc_id, @callback
 
 			it "should not call applyUpdate", ->
 				@UpdateManager.applyUpdate.called.should.equal false
