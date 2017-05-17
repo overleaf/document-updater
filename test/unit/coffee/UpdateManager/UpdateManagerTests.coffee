@@ -25,11 +25,11 @@ describe "UpdateManager", ->
 
 	describe "processOutstandingUpdates", ->
 		beforeEach ->
-			@UpdateManager.fetchAndApplyUpdates = sinon.stub().callsArg(2)
-			@UpdateManager.processOutstandingUpdates @project_id, @doc_id, @callback
+			@UpdateManager.fetchAndApplyUpdates = sinon.stub().callsArg(3)
+			@UpdateManager.processOutstandingUpdates @project_id, @doc_id, @lockValue, @callback
 
 		it "should apply the updates", ->
-			@UpdateManager.fetchAndApplyUpdates.calledWith(@project_id, @doc_id).should.equal true
+			@UpdateManager.fetchAndApplyUpdates.calledWith(@project_id, @doc_id, @lockValue).should.equal true
 
 		it "should call the callback", ->
 			@callback.called.should.equal true
@@ -43,7 +43,7 @@ describe "UpdateManager", ->
 				@LockManager.tryLock = sinon.stub().callsArgWith(1, null, true, @lockValue = "mock-lock-value")
 				@LockManager.releaseLock = sinon.stub().callsArg(2)
 				@UpdateManager.continueProcessingUpdatesWithLock = sinon.stub().callsArg(2)
-				@UpdateManager.processOutstandingUpdates = sinon.stub().callsArg(2)
+				@UpdateManager.processOutstandingUpdates = sinon.stub().callsArg(3)
 
 			describe "successfully", ->
 				beforeEach ->
@@ -56,7 +56,7 @@ describe "UpdateManager", ->
 					@LockManager.releaseLock.calledWith(@doc_id, @lockValue).should.equal true
 
 				it "should process the outstanding updates", ->
-					@UpdateManager.processOutstandingUpdates.calledWith(@project_id, @doc_id).should.equal true
+					@UpdateManager.processOutstandingUpdates.calledWith(@project_id, @doc_id, @lockValue).should.equal true
 					
 				it "should do everything with the lock acquired", ->
 					@UpdateManager.processOutstandingUpdates.calledAfter(@LockManager.tryLock).should.equal true
@@ -70,7 +70,7 @@ describe "UpdateManager", ->
 
 			describe "when processOutstandingUpdates returns an error", ->
 				beforeEach ->
-					@UpdateManager.processOutstandingUpdates = sinon.stub().callsArgWith(2, @error = new Error("Something went wrong"))
+					@UpdateManager.processOutstandingUpdates = sinon.stub().callsArgWith(3, @error = new Error("Something went wrong"))
 					@UpdateManager.processOutstandingUpdatesWithLock @project_id, @doc_id, @callback
 
 				it "should free the lock", ->
@@ -82,7 +82,7 @@ describe "UpdateManager", ->
 		describe "when the lock is taken", ->
 			beforeEach ->
 				@LockManager.tryLock = sinon.stub().callsArgWith(1, null, false)
-				@UpdateManager.processOutstandingUpdates = sinon.stub().callsArg(2)
+				@UpdateManager.processOutstandingUpdates = sinon.stub().callsArg(3)
 				@UpdateManager.processOutstandingUpdatesWithLock @project_id, @doc_id, @callback
 
 			it "should return the callback", ->
@@ -122,9 +122,10 @@ describe "UpdateManager", ->
 				@updates = [{p: 1, t: "foo"}]
 				@updatedDocLines = ["updated", "lines"]
 				@version = 34
+				@LockManager.extendLock = sinon.stub().callsArg(1)
 				@RealTimeRedisManager.getPendingUpdatesForDoc = sinon.stub().callsArgWith(1, null, @updates)
 				@UpdateManager.applyUpdate = sinon.stub().callsArgWith(3, null, @updatedDocLines, @version)
-				@UpdateManager.fetchAndApplyUpdates @project_id, @doc_id, @callback
+				@UpdateManager.fetchAndApplyUpdates @project_id, @doc_id, @lockValue, @callback
 
 			it "should get the pending updates", ->
 				@RealTimeRedisManager.getPendingUpdatesForDoc.calledWith(@doc_id).should.equal true
@@ -141,10 +142,11 @@ describe "UpdateManager", ->
 		describe "when there are no updates", ->
 			beforeEach ->
 				@updates = []
+				@LockManager.extendLock = sinon.stub().callsArg(1)
 				@RealTimeRedisManager.getPendingUpdatesForDoc = sinon.stub().callsArgWith(1, null, @updates)
 				@UpdateManager.applyUpdate = sinon.stub()
 				@RedisManager.setDocument = sinon.stub()
-				@UpdateManager.fetchAndApplyUpdates @project_id, @doc_id, @callback
+				@UpdateManager.fetchAndApplyUpdates @project_id, @doc_id, @lockValue, @callback
 
 			it "should not call applyUpdate", ->
 				@UpdateManager.applyUpdate.called.should.equal false

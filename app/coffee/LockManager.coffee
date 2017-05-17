@@ -17,20 +17,29 @@ module.exports = LockManager =
 	MAX_TEST_INTERVAL: 1000 # back off to 1s between each test of the lock
 	MAX_LOCK_WAIT_TIME: 10000 # 10s maximum time to spend trying to get the lock
 	LOCK_TTL: 30 # seconds. Time until lock auto expires in redis.
+	EXTEND_DELAY: 1000 # only extend the lock if it is more than 1s old
 
 	# Use a signed lock value as described in
 	# http://redis.io/topics/distlock#correct-implementation-with-a-single-instance
 	# to prevent accidental unlocking by multiple processes
-	randomLock : () ->
+	randomLock : (key) ->
 		time = Date.now()
-		return "locked:host=#{HOST}:pid=#{PID}:random=#{RND}:time=#{time}:count=#{COUNT++}"
+		lockValue = {
+			key: key
+			creationTime: time
+			expiryTime: time + LockManager.LOCK_TTL*1000
+			lastModifiedTime: time
+			uid:"locked:host=#{HOST}:pid=#{PID}:random=#{RND}:time=#{time}:count=#{COUNT++}"
+		}
+		return lockValue
 
 	unlockScript: 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
+	extendScript: 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("expire", KEYS[1], ARGV[2]) else return 0 end';
 
 	tryLock : (doc_id, callback = (err, isFree)->)->
-		lockValue = LockManager.randomLock()
 		key = keys.blockingKey(doc_id:doc_id)
-		rclient.set key, lockValue, "EX", @LOCK_TTL, "NX", (err, gotLock)->
+		lockValue = LockManager.randomLock(key)
+		rclient.set key, lockValue.uid, "EX", @LOCK_TTL, "NX", (err, gotLock)->
 			return callback(err) if err?
 			if gotLock == "OK"
 				metrics.inc "doc-not-blocking"
@@ -70,12 +79,28 @@ module.exports = LockManager =
 				metrics.inc "doc-not-blocking"
 				callback err, true
 
+	extendLock: (lockValue, callback) ->
+		now = Date.now()
+		timeSinceLastCheck = now - lockValue.lastModifiedTime
+		if timeSinceLastCheck > LockManager.EXTEND_DELAY
+			lockValue.lastModifiedTime = now # don't check again for another second
+			rclient.eval LockManager.extendScript, 1, lockValue.key, lockValue.uid, @LOCK_TTL, (err, result) ->
+				return callback(err) if err?
+				if result is 1
+					lockValue.expiryTime = now + (LockManager.LOCK_TTL * 1000)
+					callback() ## extended lock ok
+				else
+					# failed to extend the lock
+					callback(new Error("failed to extend the lock"))
+		else
+			callback()
+
 	releaseLock: (doc_id, lockValue, callback)->
 		key = keys.blockingKey(doc_id:doc_id)
-		rclient.eval LockManager.unlockScript, 1, key, lockValue, (err, result) ->
+		rclient.eval LockManager.unlockScript, 1, key, lockValue.uid, (err, result) ->
 			if err?
 				return callback(err)
 			if result? and result isnt 1 # successful unlock should release exactly one key
-				logger.error {doc_id:doc_id, lockValue:lockValue, redis_err:err, redis_result:result}, "unlocking error"
+				logger.error {doc_id:doc_id, lockValue:lockValue.uid, redis_err:err, redis_result:result}, "unlocking error"
 				return callback(new Error("tried to release timed out lock"))
 			callback(err,result)

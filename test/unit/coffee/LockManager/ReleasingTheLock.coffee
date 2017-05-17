@@ -27,7 +27,7 @@ describe 'LockManager - releasing the lock', ()->
 			}
 			"./Metrics": {inc: () ->}
 		@LockManager = SandboxedModule.require(modulePath, requires: mocks)
-		@lockValue = "lock-value-stub"
+		@lockValue = {uid: "lock-value-stub"}
 
 	describe "when the lock is current", ->
 		beforeEach ->
@@ -35,7 +35,7 @@ describe 'LockManager - releasing the lock', ()->
 			@LockManager.releaseLock doc_id, @lockValue, @callback
 
 		it 'should clear the data from redis', ->
-			@client.eval.calledWith(@LockManager.unlockScript, 1, "Blocking:#{doc_id}", @lockValue).should.equal true
+			@client.eval.calledWith(@LockManager.unlockScript, 1, "Blocking:#{doc_id}", @lockValue.uid).should.equal true
 
 		it 'should call the callback', ->
 			@callback.called.should.equal true

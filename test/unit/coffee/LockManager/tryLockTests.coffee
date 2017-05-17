@@ -25,13 +25,13 @@ describe 'LockManager - trying the lock', ->
 	
 	describe "when the lock is not set", ->
 		beforeEach ->
-			@lockValue = "mock-lock-value"
+			@lockValue = {key: "Blocking:#{@doc_id}", uid: "mock-lock-value"}
 			@LockManager.randomLock = sinon.stub().returns @lockValue
 			@set.callsArgWith(5, null, "OK")
 			@LockManager.tryLock @doc_id, @callback
 
 		it "should set the lock key with an expiry if it is not set", ->
-			@set.calledWith("Blocking:#{@doc_id}", @lockValue, "EX", 30, "NX")
+			@set.calledWith("Blocking:#{@doc_id}", @lockValue.uid, "EX", 30, "NX")
 				.should.equal true
 
 		it "should return the callback with true and the lock value", ->
