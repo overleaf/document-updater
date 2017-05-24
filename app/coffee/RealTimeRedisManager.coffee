@@ -1,5 +1,7 @@
 Settings = require('settings-sharelatex')
-rclient = require("redis-sharelatex").createClient(Settings.redis.realtime)
+redis = require("redis-sharelatex")
+rclient = redis.createClient(Settings.redis.realtime)
+rclientPubSub = redis.createClient(Settings.redis.realtime)
 Keys = Settings.redis.realtime.key_schema
 logger = require('logger-sharelatex')
 
@@ -24,4 +26,4 @@ module.exports = RealTimeRedisManager =
 		rclient.llen Keys.pendingUpdates({doc_id}), callback
 
 	sendData: (data) ->
-		rclient.publish "applied-ops", JSON.stringify(data)
+		rclientPubSub.publish "applied-ops", JSON.stringify(data)
