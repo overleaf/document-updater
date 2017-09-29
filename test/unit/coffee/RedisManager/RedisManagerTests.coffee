@@ -29,6 +29,7 @@ describe "RedisManager", ->
 								pendingUpdates: ({doc_id}) -> "PendingUpdates:#{doc_id}"
 								docsInProject: ({project_id}) -> "DocsIn:#{project_id}"
 								ranges: ({doc_id}) -> "Ranges:#{doc_id}"
+								pathname: ({doc_id}) -> "Pathname:#{doc_id}"
 								projectState: ({project_id}) -> "ProjectState:#{project_id}"
 						history:
 							key_schema:
@@ -48,7 +49,7 @@ describe "RedisManager", ->
 				"./Errors": Errors
 			globals:
 				JSON: @JSON = JSON
-		
+
 		@doc_id = "doc-id-123"
 		@project_id = "project-id-123"
 		@callback = sinon.stub()
@@ -61,8 +62,9 @@ describe "RedisManager", ->
 			@hash = crypto.createHash('sha1').update(@jsonlines,'utf8').digest('hex')
 			@ranges = { comments: "mock", entries: "mock" }
 			@json_ranges = JSON.stringify @ranges
+			@pathname = '/a/b/c.tex'
 			@rclient.get = sinon.stub()
-			@rclient.exec = sinon.stub().callsArgWith(0, null, [@jsonlines, @version, @hash, @project_id, @json_ranges])
+			@rclient.exec = sinon.stub().callsArgWith(0, null, [@jsonlines, @version, @hash, @project_id, @json_ranges, @pathname])
 			@rclient.sadd = sinon.stub().yields(null, 0)
 
 		describe "successfully", ->
@@ -73,7 +75,7 @@ describe "RedisManager", ->
 				@rclient.get
 					.calledWith("doclines:#{@doc_id}")
 					.should.equal true
-			
+
 			it "should get the version from", ->
 				@rclient.get
 					.calledWith("DocVersion:#{@doc_id}")
@@ -87,6 +89,11 @@ describe "RedisManager", ->
 			it "should get the ranges", ->
 				@rclient.get
 					.calledWith("Ranges:#{@doc_id}")
+					.should.equal true
+
+			it "should get the pathname", ->
+				@rclient.get
+					.calledWith("Pathname:#{@doc_id}")
 					.should.equal true
 
 			it "should check if the document is in the DocsIn set", ->
@@ -259,7 +266,7 @@ describe "RedisManager", ->
 				@rclient.get = sinon.stub().callsArgWith(1, null, @version.toString())
 				@rclient.lrange = sinon.stub().callsArgWith(3, null, @jsonOps)
 				@RedisManager.getPreviousDocOps(@doc_id, @start, @end, @callback)
-				
+
 			it "should return an error", ->
 				@callback.calledWith(new Errors.OpRangeNotAvailableError("doc ops range is not loaded in redis")).should.equal true
 
@@ -304,7 +311,7 @@ describe "RedisManager", ->
 			@rclient.del = sinon.stub()
 			@rclient.eval = sinon.stub()
 			@RedisManager.getDocVersion = sinon.stub()
-			
+
 			@lines = ["one", "two", "three", "これは"]
 			@ops = [{ op: [{ i: "foo", p: 4 }] },{ op: [{ i: "bar", p: 8 }] }]
 			@version = 42
@@ -317,17 +324,17 @@ describe "RedisManager", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
 				@RedisManager.updateDocument @doc_id, @lines, @version, @ops, @ranges, @callback
-		
+
 			it "should get the current doc version to check for consistency", ->
 				@RedisManager.getDocVersion
 					.calledWith(@doc_id)
 					.should.equal true
-		
+
 			it "should set the doclines", ->
 				@rclient.eval
 					.calledWith(sinon.match(/redis.call/), 1, "doclines:#{@doc_id}", JSON.stringify(@lines))
 					.should.equal true
-				
+
 			it "should set the version", ->
 				@rclient.set
 					.calledWith("DocVersion:#{@doc_id}", @version)
@@ -337,7 +344,7 @@ describe "RedisManager", ->
 				@rclient.set
 					.calledWith("DocHash:#{@doc_id}", @hash)
 					.should.equal true
-				
+
 			it "should set the ranges", ->
 				@rclient.set
 					.calledWith("Ranges:#{@doc_id}", JSON.stringify(@ranges))
@@ -364,45 +371,45 @@ describe "RedisManager", ->
 			it 'should not log any errors', ->
 				@logger.error.calledWith()
 					.should.equal false
-		
+
 		describe "with an inconsistent version", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length - 1)
 				@RedisManager.updateDocument @doc_id, @lines, @version, @ops, @ranges, @callback
-			
+
 			it "should not call multi.exec", ->
 				@rclient.exec.called.should.equal false
-				
+
 			it "should call the callback with an error", ->
 				@callback
 					.calledWith(new Error("Version mismatch. '#{@doc_id}' is corrupted."))
 					.should.equal true
-		
+
 		describe "with no updates", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version)
 				@RedisManager.updateDocument @doc_id, @lines, @version, [], @ranges, @callback
-			
+
 			it "should not do an rpush", ->
 				@rclient.rpush
 					.called
 					.should.equal false
-		
+
 			it "should still set the doclines", ->
 				@rclient.eval
 					.calledWith(sinon.match(/redis.call/), 1, "doclines:#{@doc_id}", JSON.stringify(@lines))
 					.should.equal true
-		
+
 		describe "with empty ranges", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
 				@RedisManager.updateDocument @doc_id, @lines, @version, @ops, {}, @callback
-			
+
 			it "should not set the ranges", ->
 				@rclient.set
 					.calledWith("Ranges:#{@doc_id}", JSON.stringify(@ranges))
 					.should.equal false
-					
+
 			it "should delete the ranges key", ->
 				@rclient.del
 					.calledWith("Ranges:#{@doc_id}")
@@ -431,13 +438,13 @@ describe "RedisManager", ->
 
 			afterEach ->
 				@JSON.stringify = @_stringify
-			
+
 			it "should log an error", ->
 				@logger.error.called.should.equal true
 
 			it "should call the callback with an error", ->
 				@callback.calledWith(new Error("null bytes found in doc lines")).should.equal true
-	
+
 		describe "with ranges that are too big", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
@@ -461,16 +468,17 @@ describe "RedisManager", ->
 			@hash = crypto.createHash('sha1').update(JSON.stringify(@lines),'utf8').digest('hex')
 			@rclient.exec = sinon.stub().callsArgWith(0, null, [@hash])
 			@ranges = { comments: "mock", entries: "mock" }
-		
+			@pathname = '/a/b/c.tex'
+
 		describe "with non-empty ranges", ->
 			beforeEach (done) ->
-				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, done
-			
+				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, @pathname, done
+
 			it "should set the lines", ->
 				@rclient.eval
 					.calledWith(sinon.match(/redis.call/), 1, "doclines:#{@doc_id}", JSON.stringify(@lines))
 					.should.equal true
-			
+
 			it "should set the version", ->
 				@rclient.set
 					.calledWith("DocVersion:#{@doc_id}", @version)
@@ -480,17 +488,22 @@ describe "RedisManager", ->
 				@rclient.set
 					.calledWith("DocHash:#{@doc_id}", @hash)
 					.should.equal true
-				
+
 			it "should set the ranges", ->
 				@rclient.set
 					.calledWith("Ranges:#{@doc_id}", JSON.stringify(@ranges))
 					.should.equal true
-				
+
 			it "should set the project_id for the doc", ->
 				@rclient.set
 					.calledWith("ProjectId:#{@doc_id}", @project_id)
 					.should.equal true
-			
+
+			it "should set the pathname for the doc", ->
+				@rclient.set
+					.calledWith("Pathname:#{@doc_id}", @pathname)
+					.should.equal true
+
 			it "should add the doc_id to the project set", ->
 				@rclient.sadd
 					.calledWith("DocsIn:#{@project_id}", @doc_id)
@@ -499,16 +512,16 @@ describe "RedisManager", ->
 			it 'should not log any errors', ->
 				@logger.error.calledWith()
 					.should.equal false
-	
+
 		describe "with empty ranges", ->
 			beforeEach (done) ->
-				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, {}, done
-				
+				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, {}, @pathname, done
+
 			it "should delete the ranges key", ->
 				@rclient.del
 					.calledWith("Ranges:#{@doc_id}")
 					.should.equal true
-				
+
 			it "should not set the ranges", ->
 				@rclient.set
 					.calledWith("Ranges:#{@doc_id}", JSON.stringify(@ranges))
@@ -517,7 +530,7 @@ describe "RedisManager", ->
 		describe "with a corrupted write", ->
 			beforeEach (done) ->
 				@rclient.exec = sinon.stub().callsArgWith(0, null, ["INVALID-HASH-VALUE"])
-				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, done
+				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, @pathname, done
 
 			it 'should log a hash error', ->
 				@logger.error.calledWith()
@@ -527,21 +540,21 @@ describe "RedisManager", ->
 			beforeEach ->
 				@_stringify = JSON.stringify
 				@JSON.stringify = () -> return '["bad bytes! \u0000 <- here"]'
-				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, @callback
+				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, @pathname, @callback
 
 			afterEach ->
 				@JSON.stringify = @_stringify
-			
+
 			it "should log an error", ->
 				@logger.error.called.should.equal true
 
 			it "should call the callback with an error", ->
 				@callback.calledWith(new Error("null bytes found in doc lines")).should.equal true
-	
+
 		describe "with ranges that are too big", ->
 			beforeEach ->
 				@RedisManager._serializeRanges = sinon.stub().yields(new Error("ranges are too large"))
-				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, @callback
+				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, @pathname, @callback
 
 			it 'should log an error', ->
 				@logger.error.called.should.equal true
@@ -555,12 +568,12 @@ describe "RedisManager", ->
 			@rclient.srem = sinon.stub()
 			@rclient.exec.yields()
 			@RedisManager.removeDocFromMemory @project_id, @doc_id, done
-		
+
 		it "should delete the lines", ->
 			@rclient.del
 				.calledWith("doclines:#{@doc_id}")
 				.should.equal true
-		
+
 		it "should delete the version", ->
 			@rclient.del
 				.calledWith("DocVersion:#{@doc_id}")
@@ -570,15 +583,20 @@ describe "RedisManager", ->
 			@rclient.del
 				.calledWith("DocHash:#{@doc_id}")
 				.should.equal true
-		
+
 		it "should delete the project_id for the doc", ->
 			@rclient.del
 				.calledWith("ProjectId:#{@doc_id}")
 				.should.equal true
-		
+
 		it "should remove the doc_id from the project set", ->
 			@rclient.srem
 				.calledWith("DocsIn:#{@project_id}", @doc_id)
+				.should.equal true
+
+		it "should delete the pathname for the doc", ->
+			@rclient.del
+				.calledWith("Pathname:#{@doc_id}")
 				.should.equal true
 
 	describe "clearProjectState", ->
