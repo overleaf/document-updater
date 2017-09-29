@@ -163,8 +163,9 @@ describe "UpdateManager", ->
 			@lines = ["original", "lines"]
 			@ranges = { entries: "mock", comments: "mock" }
 			@updated_ranges = { entries: "updated", comments: "updated" }
-			@appliedOps = ["mock-applied-ops"]
-			@DocumentManager.getDoc = sinon.stub().yields(null, @lines, @version, @ranges)
+			@appliedOps = [ {v: 42, op: "mock-op-42"}, { v: 45, op: "mock-op-45" }]
+			@pathname = '/a/b/c.tex'
+			@DocumentManager.getDoc = sinon.stub().yields(null, @lines, @version, @ranges, false, @pathname)
 			@RangesManager.applyUpdate = sinon.stub().yields(null, @updated_ranges)
 			@ShareJsUpdateManager.applyUpdate = sinon.stub().yields(null, @updatedDocLines, @version, @appliedOps)
 			@RedisManager.updateDocument = sinon.stub().yields()
