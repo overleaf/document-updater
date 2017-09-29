@@ -26,6 +26,7 @@ describe "DocumentManager", ->
 		@lines = ["one", "two", "three"]
 		@version = 42
 		@ranges = { comments: "mock", entries: "mock" }
+		@pathname = '/a/b/c.tex'
 
 	describe "flushAndDeleteDoc", ->
 		describe "successfully", ->
@@ -34,7 +35,7 @@ describe "DocumentManager", ->
 				@DocumentManager.flushDocIfLoaded = sinon.stub().callsArgWith(2)
 				@HistoryManager.flushDocChanges = sinon.stub().callsArg(2)
 				@DocumentManager.flushAndDeleteDoc @project_id, @doc_id, @callback
-			
+
 			it "should flush the doc", ->
 				@DocumentManager.flushDocIfLoaded
 					.calledWith(@project_id, @doc_id)
@@ -50,12 +51,12 @@ describe "DocumentManager", ->
 
 			it "should time the execution", ->
 				@Metrics.Timer::done.called.should.equal true
-			
+
 			it "should flush to the history api", ->
 				@HistoryManager.flushDocChanges
 					.calledWith(@project_id, @doc_id)
 					.should.equal true
-	
+
 	describe "flushDocIfLoaded", ->
 		describe "when the doc is in Redis", ->
 			beforeEach ->
@@ -72,7 +73,7 @@ describe "DocumentManager", ->
 				@PersistenceManager.setDoc
 					.calledWith(@project_id, @doc_id, @lines, @version, @ranges)
 					.should.equal true
-			
+
 			it "should call the callback without error", ->
 				@callback.calledWith(null).should.equal true
 
@@ -100,7 +101,7 @@ describe "DocumentManager", ->
 
 			it "should time the execution", ->
 				@Metrics.Timer::done.called.should.equal true
-	
+
 	describe "getDocAndRecentOps", ->
 		describe "with a previous version specified", ->
 			beforeEach ->
@@ -143,18 +144,18 @@ describe "DocumentManager", ->
 
 			it "should time the execution", ->
 				@Metrics.Timer::done.called.should.equal true
-	
+
 	describe "getDoc", ->
 		describe "when the doc exists in Redis", ->
 			beforeEach ->
-				@RedisManager.getDoc = sinon.stub().callsArgWith(2, null, @lines, @version, @ranges)
+				@RedisManager.getDoc = sinon.stub().callsArgWith(2, null, @lines, @version, @ranges, @pathname)
 				@DocumentManager.getDoc @project_id, @doc_id, @callback
 
 			it "should get the doc from Redis", ->
 				@RedisManager.getDoc
 					.calledWith(@project_id, @doc_id)
 					.should.equal true
-			
+
 			it "should call the callback with the doc info", ->
 				@callback.calledWith(null, @lines, @version, @ranges, true).should.equal true
 
@@ -163,8 +164,8 @@ describe "DocumentManager", ->
 
 		describe "when the doc does not exist in Redis", ->
 			beforeEach ->
-				@RedisManager.getDoc = sinon.stub().callsArgWith(2, null, null, null, null, null)
-				@PersistenceManager.getDoc = sinon.stub().callsArgWith(2, null, @lines, @version, @ranges)
+				@RedisManager.getDoc = sinon.stub().callsArgWith(2, null, null, null, null, null, null)
+				@PersistenceManager.getDoc = sinon.stub().callsArgWith(2, null, @lines, @version, @ranges, @pathname)
 				@RedisManager.putDocInMemory = sinon.stub().yields()
 				@DocumentManager.getDoc @project_id, @doc_id, @callback
 
@@ -180,7 +181,7 @@ describe "DocumentManager", ->
 
 			it "should set the doc in Redis", ->
 				@RedisManager.putDocInMemory
-					.calledWith(@project_id, @doc_id, @lines, @version, @ranges)
+					.calledWith(@project_id, @doc_id, @lines, @version, @ranges, @pathname)
 					.should.equal true
 
 			it "should call the callback with the doc info", ->
@@ -188,7 +189,7 @@ describe "DocumentManager", ->
 
 			it "should time the execution", ->
 				@Metrics.Timer::done.called.should.equal true
-	
+
 	describe "setDoc", ->
 		describe "with plain tex lines", ->
 			beforeEach ->
@@ -237,13 +238,13 @@ describe "DocumentManager", ->
 					@DocumentManager.flushDocIfLoaded
 						.calledWith(@project_id, @doc_id)
 						.should.equal true
-				
+
 				it "should call the callback", ->
 					@callback.calledWith(null).should.equal true
 
 				it "should time the execution", ->
 					@Metrics.Timer::done.called.should.equal true
-			
+
 			describe "when not already loaded", ->
 				beforeEach ->
 					@DocumentManager.getDoc = sinon.stub().callsArgWith(2, null, @beforeLines, @version, false)
@@ -260,21 +261,21 @@ describe "DocumentManager", ->
 
 				it "should return the callback with an error", ->
 					@callback.calledWith(new Error("No lines were passed to setDoc"))
-					
+
 				it "should not try to get the doc lines", ->
 					@DocumentManager.getDoc.called.should.equal false
-			
+
 			describe "with the undoing flag", ->
 				beforeEach ->
 					# Copy ops so we don't interfere with other tests
 					@ops = [{ i: "foo", p: 4 }, { d: "bar", p: 42 }]
 					@DiffCodec.diffAsShareJsOp = sinon.stub().callsArgWith(2, null, @ops)
 					@DocumentManager.setDoc @project_id, @doc_id, @afterLines, @source, @user_id, true, @callback
-				
+
 				it "should set the undo flag on each op", ->
 					for op in @ops
 						op.u.should.equal true
-	
+
 	describe "acceptChanges", ->
 		beforeEach ->
 			@change_id = "mock-change-id"
@@ -286,33 +287,33 @@ describe "DocumentManager", ->
 			@DocumentManager.getDoc = sinon.stub().yields(null, @lines, @version, @ranges)
 			@RangesManager.acceptChanges = sinon.stub().yields(null, @updated_ranges)
 			@RedisManager.updateDocument = sinon.stub().yields()
-		
+
 		describe "successfully with a single change", ->
 			beforeEach ->
 				@DocumentManager.acceptChanges @project_id, @doc_id, [ @change_id ], @callback
-			
+
 			it "should get the document's current ranges", ->
 				@DocumentManager.getDoc
 					.calledWith(@project_id, @doc_id)
 					.should.equal true
-			
+
 			it "should apply the accept change to the ranges", ->
 				@RangesManager.acceptChanges
 					.calledWith([ @change_id ], @ranges)
 					.should.equal true
-					
+
 			it "should save the updated ranges", ->
 				@RedisManager.updateDocument
 					.calledWith(@doc_id, @lines, @version, [], @updated_ranges)
 					.should.equal true
-			
+
 			it "should call the callback", ->
 				@callback.called.should.equal true
 
 		describe "successfully with multiple changes", ->
 			beforeEach ->
 				@DocumentManager.acceptChanges @project_id, @doc_id, @change_ids, @callback
-			
+
 			it "should apply the accept change to the ranges", ->
 				@RangesManager.acceptChanges
 					.calledWith(@change_ids, @ranges)
@@ -325,11 +326,11 @@ describe "DocumentManager", ->
 
 			it "should not save anything", ->
 				@RedisManager.updateDocument.called.should.equal false
-			
+
 			it "should call the callback with a not found error", ->
 				error = new Errors.NotFoundError("document not found: #{@doc_id}")
 				@callback.calledWith(error).should.equal true
-	
+
 	describe "deleteComment", ->
 		beforeEach ->
 			@comment_id = "mock-comment-id"
@@ -340,26 +341,26 @@ describe "DocumentManager", ->
 			@DocumentManager.getDoc = sinon.stub().yields(null, @lines, @version, @ranges)
 			@RangesManager.deleteComment = sinon.stub().yields(null, @updated_ranges)
 			@RedisManager.updateDocument = sinon.stub().yields()
-		
+
 		describe "successfully", ->
 			beforeEach ->
 				@DocumentManager.deleteComment @project_id, @doc_id, @comment_id, @callback
-			
+
 			it "should get the document's current ranges", ->
 				@DocumentManager.getDoc
 					.calledWith(@project_id, @doc_id)
 					.should.equal true
-			
+
 			it "should delete the comment from the ranges", ->
 				@RangesManager.deleteComment
 					.calledWith(@comment_id, @ranges)
 					.should.equal true
-					
+
 			it "should save the updated ranges", ->
 				@RedisManager.updateDocument
 					.calledWith(@doc_id, @lines, @version, [], @updated_ranges)
 					.should.equal true
-			
+
 			it "should call the callback", ->
 				@callback.called.should.equal true
 
@@ -370,7 +371,7 @@ describe "DocumentManager", ->
 
 			it "should not save anything", ->
 				@RedisManager.updateDocument.called.should.equal false
-			
+
 			it "should call the callback with a not found error", ->
 				error = new Errors.NotFoundError("document not found: #{@doc_id}")
 				@callback.calledWith(error).should.equal true
