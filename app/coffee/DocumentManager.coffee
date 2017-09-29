@@ -9,7 +9,7 @@ Errors = require "./Errors"
 RangesManager = require "./RangesManager"
 
 module.exports = DocumentManager =
-	getDoc: (project_id, doc_id, _callback = (error, lines, version, alreadyLoaded) ->) ->
+	getDoc: (project_id, doc_id, _callback = (error, lines, version, alreadyLoaded, pathname) ->) ->
 		timer = new Metrics.Timer("docManager.getDoc")
 		callback = (args...) ->
 			timer.done()
@@ -24,9 +24,9 @@ module.exports = DocumentManager =
 					logger.log {project_id, doc_id, lines, version}, "got doc from persistence API"
 					RedisManager.putDocInMemory project_id, doc_id, lines, version, ranges, pathname, (error) ->
 						return callback(error) if error?
-						callback null, lines, version, ranges, false
+						callback null, lines, version, ranges, false, pathname
 			else
-				callback null, lines, version, ranges, true
+				callback null, lines, version, ranges, true, pathname
 
 	getDocAndRecentOps: (project_id, doc_id, fromVersion, _callback = (error, lines, version, recentOps, ranges) ->) ->
 		timer = new Metrics.Timer("docManager.getDocAndRecentOps")

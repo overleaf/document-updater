@@ -157,7 +157,7 @@ describe "DocumentManager", ->
 					.should.equal true
 
 			it "should call the callback with the doc info", ->
-				@callback.calledWith(null, @lines, @version, @ranges, true).should.equal true
+				@callback.calledWith(null, @lines, @version, @ranges, true, @pathname).should.equal true
 
 			it "should time the execution", ->
 				@Metrics.Timer::done.called.should.equal true
@@ -185,7 +185,7 @@ describe "DocumentManager", ->
 					.should.equal true
 
 			it "should call the callback with the doc info", ->
-				@callback.calledWith(null, @lines, @version, @ranges, false).should.equal true
+				@callback.calledWith(null, @lines, @version, @ranges, false, @pathname).should.equal true
 
 			it "should time the execution", ->
 				@Metrics.Timer::done.called.should.equal true
