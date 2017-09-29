@@ -304,7 +304,7 @@ describe "DocumentManager", ->
 
 			it "should save the updated ranges", ->
 				@RedisManager.updateDocument
-					.calledWith(@doc_id, @lines, @version, [], @updated_ranges)
+					.calledWith(@project_id, @doc_id, @lines, @version, [], @updated_ranges)
 					.should.equal true
 
 			it "should call the callback", ->
@@ -358,7 +358,7 @@ describe "DocumentManager", ->
 
 			it "should save the updated ranges", ->
 				@RedisManager.updateDocument
-					.calledWith(@doc_id, @lines, @version, [], @updated_ranges)
+					.calledWith(@project_id, @doc_id, @lines, @version, [], @updated_ranges)
 					.should.equal true
 
 			it "should call the callback", ->

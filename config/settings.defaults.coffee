@@ -62,7 +62,7 @@ module.exports =
 			host:"localhost"
 			password:""
 			key_schema:
-				uncompressedHistoryOps: ({doc_id}) -> "UncompressedHistoryOps:#{doc_id}"
+				uncompressedHistoryOps: ({doc_id, project_id}) -> "UncompressedHistoryOps:#{doc_id}"
 				docsWithHistoryOps: ({project_id}) -> "DocsWithHistoryOps:#{project_id}"
 			# cluster: [{
 			# 	port: "7000"

@@ -33,7 +33,7 @@ describe "RedisManager", ->
 								projectState: ({project_id}) -> "ProjectState:#{project_id}"
 						history:
 							key_schema:
-								uncompressedHistoryOps: ({doc_id}) -> "UncompressedHistoryOps:#{doc_id}"
+								uncompressedHistoryOps: ({doc_id, project_id}) -> "UncompressedHistoryOps:#{doc_id}"
 								docsWithHistoryOps: ({project_id}) -> "DocsWithHistoryOps:#{project_id}"
 				}
 				"redis-sharelatex":
@@ -323,7 +323,7 @@ describe "RedisManager", ->
 		describe "with a consistent version", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
-				@RedisManager.updateDocument @doc_id, @lines, @version, @ops, @ranges, @callback
+				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, @ops, @ranges, @callback
 
 			it "should get the current doc version to check for consistency", ->
 				@RedisManager.getDocVersion
@@ -375,7 +375,7 @@ describe "RedisManager", ->
 		describe "with an inconsistent version", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length - 1)
-				@RedisManager.updateDocument @doc_id, @lines, @version, @ops, @ranges, @callback
+				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, @ops, @ranges, @callback
 
 			it "should not call multi.exec", ->
 				@rclient.exec.called.should.equal false
@@ -388,7 +388,7 @@ describe "RedisManager", ->
 		describe "with no updates", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version)
-				@RedisManager.updateDocument @doc_id, @lines, @version, [], @ranges, @callback
+				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, [], @ranges, @callback
 
 			it "should not do an rpush", ->
 				@rclient.rpush
@@ -403,7 +403,7 @@ describe "RedisManager", ->
 		describe "with empty ranges", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
-				@RedisManager.updateDocument @doc_id, @lines, @version, @ops, {}, @callback
+				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, @ops, {}, @callback
 
 			it "should not set the ranges", ->
 				@rclient.set
@@ -420,7 +420,7 @@ describe "RedisManager", ->
 				@badHash = "INVALID-HASH-VALUE"
 				@rclient.exec = sinon.stub().callsArgWith(0, null, [@badHash])
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
-				@RedisManager.updateDocument @doc_id, @lines, @version, @ops, @ranges, @callback
+				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, @ops, @ranges, @callback
 
 			it 'should log a hash error', ->
 				@logger.error.calledWith()
@@ -434,7 +434,7 @@ describe "RedisManager", ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
 				@_stringify = JSON.stringify
 				@JSON.stringify = () -> return '["bad bytes! \u0000 <- here"]'
-				@RedisManager.updateDocument @doc_id, @lines, @version, @ops, @ranges, @callback
+				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, @ops, @ranges, @callback
 
 			afterEach ->
 				@JSON.stringify = @_stringify
@@ -449,7 +449,7 @@ describe "RedisManager", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
 				@RedisManager._serializeRanges = sinon.stub().yields(new Error("ranges are too large"))
-				@RedisManager.updateDocument @doc_id, @lines, @version, @ops, @ranges, @callback
+				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, @ops, @ranges, @callback
 
 			it 'should log an error', ->
 				@logger.error.called.should.equal true

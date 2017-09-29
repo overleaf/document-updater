@@ -202,7 +202,7 @@ module.exports = RedisManager =
 
 	DOC_OPS_TTL: 60 * minutes
 	DOC_OPS_MAX_LENGTH: 100
-	updateDocument : (doc_id, docLines, newVersion, appliedOps = [], ranges, callback = (error) ->)->
+	updateDocument : (project_id, doc_id, docLines, newVersion, appliedOps = [], ranges, callback = (error) ->)->
 		RedisManager.getDocVersion doc_id, (error, currentVersion) ->
 			return callback(error) if error?
 			if currentVersion + appliedOps.length != newVersion
@@ -249,7 +249,7 @@ module.exports = RedisManager =
 					multi.rpush  keys.docOps(doc_id: doc_id), jsonOps...                         # index 5
 					# expire must come after rpush since before it will be a no-op if the list is empty
 					multi.expire keys.docOps(doc_id: doc_id), RedisManager.DOC_OPS_TTL           # index 6
-					multi.rpush  historyKeys.uncompressedHistoryOps(doc_id: doc_id), jsonOps...  # index 7
+					multi.rpush  historyKeys.uncompressedHistoryOps(doc_id: doc_id, project_id: project_id), jsonOps...  # index 7
 				multi.exec (error, result) ->
 						return callback(error) if error?
 						# check the hash computed on the redis server
