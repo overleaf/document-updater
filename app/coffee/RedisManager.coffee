@@ -152,7 +152,7 @@ module.exports = RedisManager =
 				return callback(error) if error?
 				if result isnt 0 # doc should already be in set
 					logger.error project_id: project_id, doc_id: doc_id, doc_project_id: doc_project_id, "doc missing from docsInProject set"
-				callback null, docLines, version, ranges
+				callback null, docLines, version, ranges, pathname
 
 	getDocVersion: (doc_id, callback = (error, version) ->) ->
 		rclient.get keys.docVersion(doc_id: doc_id), (error, version) ->
