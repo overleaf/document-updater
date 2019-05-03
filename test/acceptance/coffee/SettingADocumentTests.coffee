@@ -75,6 +75,7 @@ describe "Setting a document", ->
 				throw error if error?
 				expect(JSON.parse(lines)).to.deep.equal @newLines
 				done()
+			return null
 
 	describe "when the updated doc does not exist in the doc updater", ->
 		before (done) ->
@@ -103,6 +104,7 @@ describe "Setting a document", ->
 				throw error if error?
 				expect(lines).to.not.exist
 				done()
+			return null
 
 	describe "with track changes", ->
 		before ->

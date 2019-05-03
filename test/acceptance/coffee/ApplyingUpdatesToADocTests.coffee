@@ -38,6 +38,7 @@ describe "Applying updates to a doc", ->
 			DocUpdaterClient.sendUpdate @project_id, @doc_id, @update, (error) ->
 				throw error if error?
 				setTimeout done, 200
+			return null
 
 		after ->
 			MockWebApi.getDocument.restore()
@@ -46,11 +47,13 @@ describe "Applying updates to a doc", ->
 			MockWebApi.getDocument
 				.calledWith(@project_id, @doc_id)
 				.should.equal true
+			return null
 
 		it "should update the doc", (done) ->
 			DocUpdaterClient.getDoc @project_id, @doc_id, (error, res, doc) =>
 				doc.lines.should.deep.equal @result
 				done()
+			return null
 
 		it "should push the applied updates to the track changes api", (done) ->
 			rclient_history.lrange HistoryKeys.uncompressedHistoryOps({@doc_id}), 0, -1, (error, updates) =>
@@ -60,12 +63,16 @@ describe "Applying updates to a doc", ->
 					throw error if error?
 					result.should.equal 1
 					done()
+			return null
+
+
 
 		it "should push the applied updates to the project history changes api", (done) ->
 			rclient_history.lrange ProjectHistoryKeys.projectHistoryOps({@project_id}), 0, -1, (error, updates) =>
 				throw error if error?
 				JSON.parse(updates[0]).op.should.deep.equal @update.op
 				done()
+			return null
 
 		it "should set the first op timestamp", (done) ->
 			rclient_history.get ProjectHistoryKeys.projectHistoryFirstOpTimestamp({@project_id}), (error, result) =>
@@ -73,6 +80,7 @@ describe "Applying updates to a doc", ->
 				result.should.be.within(@startTime, Date.now())
 				@firstOpTimestamp = result
 				done()
+			return null
 
 		describe "when sending another update", ->
 			before (done) ->
@@ -81,6 +89,7 @@ describe "Applying updates to a doc", ->
 				DocUpdaterClient.sendUpdate @project_id, @doc_id, @second_update, (error) ->
 					throw error if error?
 					setTimeout done, 200
+			return null
 
 			it "should not change the first op timestamp", (done) ->
 				rclient_history.get ProjectHistoryKeys.projectHistoryFirstOpTimestamp({@project_id}), (error, result) =>
@@ -99,6 +108,7 @@ describe "Applying updates to a doc", ->
 				DocUpdaterClient.sendUpdate @project_id, @doc_id, @update, (error) ->
 					throw error if error?
 					setTimeout done, 200
+			return null
 
 		after ->
 			MockWebApi.getDocument.restore()
@@ -110,6 +120,7 @@ describe "Applying updates to a doc", ->
 			DocUpdaterClient.getDoc @project_id, @doc_id, (error, res, doc) =>
 				doc.lines.should.deep.equal @result
 				done()
+			return null
 
 		it "should push the applied updates to the track changes api", (done) ->
 			rclient_history.lrange HistoryKeys.uncompressedHistoryOps({@doc_id}), 0, -1, (error, updates) =>
@@ -117,12 +128,14 @@ describe "Applying updates to a doc", ->
 				rclient_history.sismember HistoryKeys.docsWithHistoryOps({@project_id}), @doc_id, (error, result) =>
 					result.should.equal 1
 					done()
+			return null
+
 
 		it "should push the applied updates to the project history changes api", (done) ->
 			rclient_history.lrange ProjectHistoryKeys.projectHistoryOps({@project_id}), 0, -1, (error, updates) =>
 				JSON.parse(updates[0]).op.should.deep.equal @update.op
 				done()
-
+			return null
 
 	describe "when the document has been deleted", ->
 		describe "when the ops come in a single linear order", ->
@@ -161,6 +174,7 @@ describe "Applying updates to a doc", ->
 					DocUpdaterClient.getDoc @project_id, @doc_id, (error, res, doc) =>
 						doc.lines.should.deep.equal @my_result
 						done()
+				return null
 
 			it "should push the applied updates to the track changes api", (done) ->
 				rclient_history.lrange HistoryKeys.uncompressedHistoryOps({@doc_id}), 0, -1, (error, updates) =>
@@ -171,6 +185,8 @@ describe "Applying updates to a doc", ->
 					rclient_history.sismember HistoryKeys.docsWithHistoryOps({@project_id}), @doc_id, (error, result) =>
 						result.should.equal 1
 						done()
+				return null
+
 
 			it "should store the doc ops in the correct order", (done) ->
 				rclient_du.lrange Keys.docOps({doc_id: @doc_id}), 0, -1, (error, updates) =>
@@ -178,6 +194,7 @@ describe "Applying updates to a doc", ->
 					for appliedUpdate, i in @updates
 						appliedUpdate.op.should.deep.equal updates[i].op
 					done()
+				return null
 
 		describe "when older ops come in after the delete", ->
 			before (done) ->
@@ -222,6 +239,7 @@ describe "Applying updates to a doc", ->
 			DocUpdaterClient.sendUpdate @project_id, @doc_id, @broken_update, (error) ->
 				throw error if error?
 				setTimeout done, 200
+			return null
 
 		it "should not update the doc", (done) ->
 			DocUpdaterClient.getDoc @project_id, @doc_id, (error, res, doc) =>
@@ -261,6 +279,7 @@ describe "Applying updates to a doc", ->
 			async.series actions, (error) =>
 				throw error if error?
 				setTimeout done, 2000
+			return null
 
 		after ->
 			MockTrackChangesApi.flushDoc.restore()
@@ -282,6 +301,7 @@ describe "Applying updates to a doc", ->
 			DocUpdaterClient.sendUpdate @project_id, @doc_id, update, (error) ->
 				throw error if error?
 				setTimeout done, 200
+			return null
 
 		it "should update the doc (using version = 0)", (done) ->
 			DocUpdaterClient.getDoc @project_id, @doc_id, (error, res, doc) =>
@@ -322,6 +342,7 @@ describe "Applying updates to a doc", ->
 						throw error if error?
 						setTimeout done, 200
 				, 200
+			return null
 
 		it "should update the doc", (done) ->
 			DocUpdaterClient.getDoc @project_id, @doc_id, (error, res, doc) =>
