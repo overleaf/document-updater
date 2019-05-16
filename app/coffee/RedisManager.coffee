@@ -1,9 +1,11 @@
 Settings = require('settings-sharelatex')
 rclient = require("redis-sharelatex").createClient(Settings.redis.documentupdater)
+redis_history = require("redis-sharelatex").createClient(Settings.redis.history)
 logger = require('logger-sharelatex')
 metrics = require('./Metrics')
 Errors = require "./Errors"
 crypto = require "crypto"
+async = require "async"
 ProjectHistoryRedisManager = require "./ProjectHistoryRedisManager"
 
 # Sometimes Redis calls take an unexpectedly long time.  We have to be
@@ -247,6 +249,7 @@ module.exports = RedisManager =
 					logger.error err: error, doc_id: doc_id, ranges: ranges, error.message
 					return callback(error)
 				multi = rclient.multi()
+				tasks = {multi: (cb) -> multi.exec cb}
 				multi.eval setScript, 1, keys.docLines(doc_id:doc_id), newDocLines  # index 0
 				multi.set    keys.docVersion(doc_id:doc_id), newVersion             # index 1
 				multi.set    keys.docHash(doc_id:doc_id), newHash                   # index 2
@@ -255,30 +258,29 @@ module.exports = RedisManager =
 					multi.set keys.ranges(doc_id:doc_id), ranges  # index 4
 				else
 					multi.del keys.ranges(doc_id:doc_id)          # also index 4
-				# push the ops last so we can get the lengths at fixed index position 7
 				if jsonOps.length > 0
 					multi.rpush  keys.docOps(doc_id: doc_id), jsonOps...                         # index 5
 					# expire must come after rpush since before it will be a no-op if the list is empty
 					multi.expire keys.docOps(doc_id: doc_id), RedisManager.DOC_OPS_TTL           # index 6
-					multi.rpush  historyKeys.uncompressedHistoryOps(doc_id: doc_id), jsonOps...  # index 7
+					tasks['history'] = (cb) ->
+						redis_history.rpush historyKeys.uncompressedHistoryOps(doc_id: doc_id), jsonOps..., cb
 					# Set the unflushed timestamp to the current time if the doc
 					# hasn't been modified before (the content in mongo has been
 					# valid up to this point). Otherwise leave it alone ("NX" flag).
 					multi.set    keys.unflushedTime(doc_id: doc_id), Date.now(), "NX"
-					multi.set keys.lastUpdatedAt(doc_id: doc_id), Date.now() # index 8
+					multi.set keys.lastUpdatedAt(doc_id: doc_id), Date.now() # index 7
 					if updateMeta?.user_id
-						multi.set keys.lastUpdatedBy(doc_id: doc_id), updateMeta.user_id # index 9
+						multi.set keys.lastUpdatedBy(doc_id: doc_id), updateMeta.user_id # index 8
 					else
-						multi.del keys.lastUpdatedBy(doc_id: doc_id) # index 9
-				multi.exec (error, result) ->
+						multi.del keys.lastUpdatedBy(doc_id: doc_id) # index 8
+				async.parallel tasks, (error, results) ->
 						return callback(error) if error?
+						result = results.multi
+						docUpdateCount = results.history
 						# check the hash computed on the redis server
 						writeHash = result?[0]
 						if logHashWriteErrors and writeHash? and writeHash isnt newHash
 							logger.error doc_id: doc_id, writeHash: writeHash, origHash: newHash, docLines:newDocLines, "hash mismatch on updateDocument"
-
-						# length of uncompressedHistoryOps queue (index 7)
-						docUpdateCount = result[7]
 
 						if jsonOps.length > 0 && Settings.apis?.project_history?.enabled
 							ProjectHistoryRedisManager.queueOps project_id, jsonOps..., (error, projectUpdateCount) ->

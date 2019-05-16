@@ -10,6 +10,8 @@ tk = require "timekeeper"
 describe "RedisManager", ->
 	beforeEach ->
 		@multi = exec: sinon.stub()
+		@rclient_history =
+			rpush: sinon.stub()
 		@rclient = multi: () => @multi
 		tk.freeze(new Date())
 		@RedisManager = SandboxedModule.require modulePath,
@@ -44,7 +46,10 @@ describe "RedisManager", ->
 								docsWithHistoryOps: ({project_id}) -> "DocsWithHistoryOps:#{project_id}"
 				}
 				"redis-sharelatex":
-					createClient: () => @rclient
+					createClient: (settings) =>
+						if settings == @settings.redis.history
+							return @rclient_history
+						return @rclient
 				"./Metrics": @metrics =
 					inc: sinon.stub()
 					Timer: class Timer
@@ -358,6 +363,7 @@ describe "RedisManager", ->
 			@ProjectHistoryRedisManager.queueOps = sinon.stub().callsArgWith(
 				@ops.length + 1, null, @project_update_list_length
 			)
+			@rclient_history.rpush.callsArgWith(-1, null, @doc_update_list_length)
 
 		describe "with a consistent version", ->
 			beforeEach ->
@@ -424,7 +430,7 @@ describe "RedisManager", ->
 						.should.equal true
 
 				it "should push the updates into the history ops list", ->
-					@multi.rpush
+					@rclient_history.rpush
 						.calledWith("UncompressedHistoryOps:#{@doc_id}", JSON.stringify(@ops[0]), JSON.stringify(@ops[1]))
 						.should.equal true
 
@@ -476,7 +482,7 @@ describe "RedisManager", ->
 				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, [], @ranges, @updateMeta, @callback
 
 			it "should not try to enqueue doc updates", ->
-				@multi.rpush
+				@rclient_history.rpush
 					.called
 					.should.equal false
 
