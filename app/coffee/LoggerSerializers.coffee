@@ -1,5 +1,17 @@
+_ = require('lodash')
+
 showLength = (thing) ->
-	"length: #{thing?.length}"
+	if thing?.length then thing.length else thing
+
+showUpdateLength = (update) ->
+	if update?.op instanceof Array
+		copy = _.cloneDeep(update)
+		copy.op.forEach (element, index) ->
+			copy.op[index].i = element.i.length if element?.i?.length?
+			copy.op[index].d = element.d.length if element?.d?.length?
+		copy
+	else
+		update
 
 module.exports =
 	# replace long values with their length
@@ -7,4 +19,4 @@ module.exports =
 	oldLines: showLength
 	newLines: showLength
 	ranges: showLength
-	update: showLength
+	update: showUpdateLength
