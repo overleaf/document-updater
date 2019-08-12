@@ -44,11 +44,19 @@ module.exports = PersistenceManager =
 					return callback(new Error("web API response had no valid doc version"))
 				if !body.pathname?
 					return callback(new Error("web API response had no valid doc pathname"))
+				# fix up any broken docs that are already in mongo
+				PersistenceManager._fixInvalidLines(body.lines) # modifies body.lines array in-place
 				return callback null, body.lines, body.version, body.ranges, body.pathname, body.projectHistoryId
 			else if res.statusCode == 404
 				return callback(new Errors.NotFoundError("doc not not found: #{url}"))
 			else
 				return callback(new Error("error accessing web API: #{url} #{res.statusCode}"))
+
+	_fixInvalidLines: (lines) ->
+		# trim any unwanted trailing '\r's from stored docs
+		matched = for line, i in lines when line.slice(-1) is '\r'
+			lines[i] = line.slice(0, -1)
+		Metrics.inc 'get-doc.replace-cr' if matched.length > 0
 
 	setDoc: (project_id, doc_id, lines, version, ranges, lastUpdatedAt, lastUpdatedBy,_callback = (error) ->) ->
 		timer = new Metrics.Timer("persistenceManager.setDoc")

@@ -9,7 +9,8 @@ DocUpdaterApp = require "./helpers/DocUpdaterApp"
 
 describe "Getting a document", ->
 	before (done) ->
-		@lines = ["one", "two", "three"]
+		@orig_lines = ["one", "two", "three", "four\r", "five"]
+		@lines = ["one", "two", "three", "four", "five"]
 		@version = 42
 		DocUpdaterApp.ensureRunning(done)
 
@@ -18,7 +19,7 @@ describe "Getting a document", ->
 			[@project_id, @doc_id] = [DocUpdaterClient.randomId(), DocUpdaterClient.randomId()]
 			sinon.spy MockWebApi, "getDocument"
 
-			MockWebApi.insertDoc @project_id, @doc_id, {lines: @lines, version: @version}
+			MockWebApi.insertDoc @project_id, @doc_id, {lines: @orig_lines, version: @version}
 
 			DocUpdaterClient.getDoc @project_id, @doc_id, (error, res, @returnedDoc) => done()
 

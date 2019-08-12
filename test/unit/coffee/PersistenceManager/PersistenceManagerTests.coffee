@@ -15,11 +15,13 @@ describe "PersistenceManager", ->
 			"./Metrics": @Metrics =
 				Timer: class Timer
 					done: sinon.stub()
+				inc: sinon.stub()
 			"logger-sharelatex": @logger = {log: sinon.stub(), err: sinon.stub()}
 		@project_id = "project-id-123"
 		@projectHistoryId = "history-id-123"
 		@doc_id = "doc-id-123"
-		@lines = ["one", "two", "three"]
+		@orig_lines = ["one", "two", "three", "four\r"]
+		@lines = ["one", "two", "three", "four"]
 		@version = 42
 		@callback = sinon.stub()
 		@ranges = { comments: "mock", entries: "mock" }
@@ -35,7 +37,7 @@ describe "PersistenceManager", ->
 	describe "getDoc", ->
 		beforeEach ->
 			@webResponse = {
-				lines: @lines,
+				lines: @orig_lines,
 				version: @version,
 				ranges: @ranges
 				pathname: @pathname,
