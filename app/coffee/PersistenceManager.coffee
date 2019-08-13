@@ -54,7 +54,7 @@ module.exports = PersistenceManager =
 
 	_fixInvalidLines: (lines) ->
 		# trim any unwanted trailing '\r's from stored docs
-		matched = for line, i in lines when line.slice(-1) is '\r'
+		matched = for line, i in lines when line.endsWith('\r')
 			lines[i] = line.slice(0, -1)
 		Metrics.inc 'get-doc.replace-cr' if matched.length > 0
 
