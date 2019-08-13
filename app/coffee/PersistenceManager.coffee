@@ -44,7 +44,7 @@ module.exports = PersistenceManager =
 					return callback(new Error("web API response had no valid doc version"))
 				if !body.pathname?
 					return callback(new Error("web API response had no valid doc pathname"))
-				# fix up any broken docs that are already in mongo
+				# fix up any broken docs that are already in mongo (overleaf/issues#2162)
 				PersistenceManager._fixInvalidLines(body.lines) # modifies body.lines array in-place
 				return callback null, body.lines, body.version, body.ranges, body.pathname, body.projectHistoryId
 			else if res.statusCode == 404
