@@ -34,6 +34,9 @@ module.exports = PersistenceManager =
 		}, (error, res, body) ->
 			return callback(error) if error?
 			if res.statusCode >= 200 and res.statusCode < 300
+				if body.length > (Settings.max_doc_length + 64 * 1024) * 2
+					Metrics.inc "persistenceManager.doc-size-limit"
+					logger.warn {project_id: project_id, doc_id: doc_id, length: body.length}, "PersistenceManager getDoc body exceeds limit"
 				try
 					body = JSON.parse body
 				catch e

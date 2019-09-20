@@ -11,11 +11,12 @@ describe "PersistenceManager", ->
 		@request.defaults = () => @request
 		@PersistenceManager = SandboxedModule.require modulePath, requires:
 			"requestretry": @request
-			"settings-sharelatex": @Settings = {}
+			"settings-sharelatex": @Settings = {max_doc_length: 64*1024}
 			"./Metrics": @Metrics =
 				Timer: class Timer
 					done: sinon.stub()
-			"logger-sharelatex": @logger = {log: sinon.stub(), err: sinon.stub()}
+				inc: sinon.stub()
+			"logger-sharelatex": @logger = {log: sinon.stub(), err: sinon.stub(), warn: sinon.stub()}
 		@project_id = "project-id-123"
 		@projectHistoryId = "history-id-123"
 		@doc_id = "doc-id-123"
@@ -130,6 +131,15 @@ describe "PersistenceManager", ->
 
 			it "should return and error", ->
 				@callback.calledWith(new Error("web API response had no valid doc pathname")).should.equal true
+
+		describe "when request returns an doc which exceeds the size limit", ->
+			beforeEach ->
+				@webResponse.lines = ["x".repeat(512*1024)]
+				@request.callsArgWith(1, null, {statusCode: 200}, JSON.stringify(@webResponse))
+				@PersistenceManager.getDoc(@project_id, @doc_id, @callback)
+
+			it "should log a warning", ->
+				@logger.warn.calledWith().should.equal true
 
 	describe "setDoc", ->
 		describe "with a successful response from the web api", ->

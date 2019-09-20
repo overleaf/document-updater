@@ -20,6 +20,7 @@ describe "RedisManager", ->
 					documentupdater: {logHashErrors: {write:true, read:true}}
 					apis:
 						project_history: {enabled: true}
+					max_doc_length: 64*1024
 					redis:
 						documentupdater:
 							key_schema:
@@ -191,6 +192,16 @@ describe "RedisManager", ->
 					.calledWith(null, @lines, @version, @ranges)
 					.should.equal true
 
+		describe "when the document exceeds the size limit", ->
+			beforeEach ->
+				@lines = ["x".repeat(512*1024)]
+				@jsonlines = JSON.stringify @lines
+				@multi.exec = sinon.stub().callsArgWith(0, null, [@jsonlines, @version, @hash, @project_id, @json_ranges, @pathname, @projectHistoryId.toString(), @unflushed_time])
+				@RedisManager.getDoc @project_id, @doc_id, @callback
+	
+			it 'should log a warning', ->
+				@logger.warn.calledWith()
+					.should.equal true
 
 		describe "with a slow request to redis", ->
 			beforeEach ->
@@ -547,6 +558,16 @@ describe "RedisManager", ->
 					.calledWith("lastUpdatedAt:#{@doc_id}", Date.now())
 					.should.equal true
 
+		describe "when the document exceeds the size limit", ->
+			beforeEach ->
+				@lines = ["x".repeat(512*1024)]
+				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
+				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, @ops, @ranges, @updateMeta, @callback
+
+			it 'should log a warning', ->
+				@logger.warn.calledWith()
+					.should.equal true
+
 	describe "putDocInMemory", ->
 		beforeEach ->
 			@multi.set = sinon.stub()
@@ -646,6 +667,15 @@ describe "RedisManager", ->
 
 			it "should call the callback with the error", ->
 				@callback.calledWith(new Error("ranges are too large")).should.equal true
+
+		describe "when the document exceeds the size limit", ->
+			beforeEach ->
+				@lines = ["x".repeat(512*1024)]
+				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, @pathname, @projectHistoryId, @callback
+
+			it 'should log a warning', ->
+				@logger.warn.calledWith()
+					.should.equal true
 
 	describe "removeDocFromMemory", ->
 		beforeEach (done) ->

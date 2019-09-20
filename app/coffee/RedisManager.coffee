@@ -37,6 +37,9 @@ module.exports = RedisManager =
 			error = new Error("null bytes found in doc lines")
 			logger.error {err: error, doc_id: doc_id, docLines: docLines}, error.message
 			return callback(error)
+		if docLines.length > (Settings.max_doc_length + 64 * 1024) * 2
+			metrics.inc "redis.doc-size-limit"
+			logger.warn {project_id: project_id, doc_id: doc_id, length: docLines.length}, "putDocInMemory doclines exceeds expected limit"
 		docHash = RedisManager._computeHash(docLines)
 		logger.log {project_id, doc_id, version, docHash, pathname, projectHistoryId}, "putting doc in redis"
 		RedisManager._serializeRanges ranges, (error, ranges) ->
@@ -126,6 +129,9 @@ module.exports = RedisManager =
 				computedHash = RedisManager._computeHash(docLines)
 				if logHashReadErrors and computedHash isnt storedHash
 					logger.error project_id: project_id, doc_id: doc_id, doc_project_id: doc_project_id, computedHash: computedHash, storedHash: storedHash, docLines:docLines, "hash mismatch on retrieved document"
+			if docLines? and docLines.length > (Settings.max_doc_length + 64 * 1024) * 2
+				metrics.inc "redis.doc-size-limit"
+				logger.warn {project_id: project_id, doc_id: doc_id, length: docLines.length}, "getDoc doclines exceeds expected limit"
 
 			try
 				docLines = JSON.parse docLines
@@ -221,6 +227,9 @@ module.exports = RedisManager =
 				error = new Error("null bytes found in doc lines")
 				logger.error {err: error, doc_id: doc_id, newDocLines: newDocLines}, error.message
 				return callback(error)
+			if newDocLines.length > (Settings.max_doc_length + 64 * 1024) * 2
+				metrics.inc "redis.doc-size-limit"
+				logger.warn {project_id: project_id, doc_id: doc_id, length: newDocLines.length}, "updateDoc doclines exceeds expected limit"
 			newHash = RedisManager._computeHash(newDocLines)
 
 			opVersions = appliedOps.map (op) -> op?.v
