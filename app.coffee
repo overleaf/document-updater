@@ -132,6 +132,7 @@ app.use (error, req, res, next) ->
 shutdownCleanly = (signal) ->
 	return () ->
 		logger.log signal: signal, "received interrupt, cleaning up"
+		return if Settings.shuttingDown # avoid multiple shutdowns
 		Settings.shuttingDown = true
 		setTimeout () ->
 			logger.log signal: signal, "shutting down"
