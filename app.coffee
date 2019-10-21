@@ -126,6 +126,8 @@ app.use (error, req, res, next) ->
 	else if error instanceof Errors.OpRangeNotAvailableError
 		res.send 422 # Unprocessable Entity
 	else
+		if error.name is 'MaxRetriesPerRequestError' # shut down on fatal redis error
+			shutdownCleanly(error.name)
 		logger.error err: error, req: req, "request errored"
 		res.send(500, "Oops, something went wrong")
 
