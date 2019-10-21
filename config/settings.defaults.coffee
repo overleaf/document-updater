@@ -74,7 +74,7 @@ module.exports =
 				lastUpdatedAt: ({doc_id}) -> "lastUpdatedAt:{#{doc_id}}"
 				pendingUpdates: ({doc_id}) -> "PendingUpdates:{#{doc_id}}"
 				flushAndDeleteQueue: () -> "DocUpdaterFlushAndDeleteQueue"
-	
+
 	max_doc_length: 2 * 1024 * 1024 # 2mb
 
 	dispatcherCount: process.env["DISPATCHER_COUNT"]
