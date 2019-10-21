@@ -3,10 +3,13 @@ logger = require('logger-sharelatex')
 Keys = require('./UpdateKeys')
 redis = require("redis-sharelatex")
 Errors = require("./Errors")
+{EventEmitter} = require 'events'
 
 UpdateManager = require('./UpdateManager')
 Metrics = require('./Metrics')
 RateLimitManager = require('./RateLimitManager')
+
+DispatcherEvents = new EventEmitter()
 
 module.exports = DispatchManager =
 	createDispatcher: (RateLimiter) ->
@@ -33,6 +36,7 @@ module.exports = DispatchManager =
 									logger.warn err: error, project_id: project_id, doc_id: doc_id, "error processing update"
 								else
 									logger.error err: error, project_id: project_id, doc_id: doc_id, "error processing update"
+									DispatcherEvents.emit 'error', error
 							cb()
 					RateLimiter.run backgroundTask, callback
 						
@@ -53,3 +57,4 @@ module.exports = DispatchManager =
 		for i in [1..number]
 			worker = DispatchManager.createDispatcher(RateLimiter)
 			worker.run()
+		return DispatcherEvents

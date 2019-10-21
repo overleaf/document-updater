@@ -32,7 +32,7 @@ app.configure ->
 	app.use app.router
 Metrics.injectMetricsRoute(app)
 
-DispatchManager.createAndStartDispatchers(Settings.dispatcherCount || 10)
+dispatcherEvents = DispatchManager.createAndStartDispatchers(Settings.dispatcherCount || 10)
 
 app.param 'project_id', (req, res, next, project_id) ->
 	if project_id?.match /^[0-9a-f]{24}$/
@@ -130,6 +130,10 @@ app.use (error, req, res, next) ->
 			shutdownCleanly(error.name)
 		logger.error err: error, req: req, "request errored"
 		res.send(500, "Oops, something went wrong")
+
+dispatcherEvents.on 'error', (error) ->
+	if error?.name is 'MaxRetriesPerRequestError'
+		shutdownCleanly(error.name)
 
 shutdownCleanly = (signal) ->
 	logger.log signal: signal, "received interrupt, cleaning up"
