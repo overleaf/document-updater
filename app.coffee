@@ -130,14 +130,13 @@ app.use (error, req, res, next) ->
 		res.send(500, "Oops, something went wrong")
 
 shutdownCleanly = (signal) ->
-	return () ->
-		logger.log signal: signal, "received interrupt, cleaning up"
-		return if Settings.shuttingDown # avoid multiple shutdowns
-		Settings.shuttingDown = true
-		setTimeout () ->
-			logger.log signal: signal, "shutting down"
-			process.exit()
-		, 10000
+	logger.log signal: signal, "received interrupt, cleaning up"
+	return if Settings.shuttingDown # avoid multiple shutdowns
+	Settings.shuttingDown = true
+	setTimeout () ->
+		logger.log signal: signal, "shutting down"
+		process.exit()
+	, 10000
 
 watchForEvent = (eventName)->
 	docUpdaterRedisClient.on eventName, (e)->
@@ -160,5 +159,5 @@ if !module.parent # Called directly
 module.exports = app
 
 for signal in ['SIGINT', 'SIGHUP', 'SIGQUIT', 'SIGUSR1', 'SIGUSR2', 'SIGTERM', 'SIGABRT']
-	process.on signal, shutdownCleanly(signal)
+	process.on signal, shutdownCleanly
 
