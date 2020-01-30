@@ -26,6 +26,9 @@ keys = Settings.redis.documentupdater.key_schema
 historyKeys = Settings.redis.history.key_schema
 
 module.exports = RedisManager =
+	# the string starts with null | all null characters are escaped
+	HAS_ESCAPED_NULL_CHARACTERS: /(?:^|[^\\])\\u0000/
+
 	rclient: rclient
 
 	putDocInMemory : (project_id, doc_id, docLines, version, ranges, pathname, projectHistoryId, _callback)->
@@ -34,7 +37,7 @@ module.exports = RedisManager =
 			timer.done()
 			_callback(error)
 		docLines = JSON.stringify(docLines)
-		if docLines.indexOf("\u0000") != -1
+		if RedisManager.HAS_ESCAPED_NULL_CHARACTERS.test(docLines)
 			error = new Error("null bytes found in doc lines")
 			logger.error {err: error, doc_id: doc_id, docLines: docLines}, error.message
 			return callback(error)
@@ -222,13 +225,13 @@ module.exports = RedisManager =
 
 			jsonOps = appliedOps.map (op) -> JSON.stringify op
 			for op in jsonOps
-				if op.indexOf("\u0000") != -1
+				if RedisManager.HAS_ESCAPED_NULL_CHARACTERS.test(op)
 					error = new Error("null bytes found in jsonOps")
 					logger.error {err: error, doc_id: doc_id, jsonOps: jsonOps}, error.message
 					return callback(error)
 
 			newDocLines = JSON.stringify(docLines)
-			if newDocLines.indexOf("\u0000") != -1
+			if RedisManager.HAS_ESCAPED_NULL_CHARACTERS.test(newDocLines)
 				error = new Error("null bytes found in doc lines")
 				logger.error {err: error, doc_id: doc_id, newDocLines: newDocLines}, error.message
 				return callback(error)
@@ -241,7 +244,7 @@ module.exports = RedisManager =
 				if error?
 					logger.error {err: error, doc_id}, error.message
 					return callback(error)
-				if ranges? and ranges.indexOf("\u0000") != -1
+				if ranges? and RedisManager.HAS_ESCAPED_NULL_CHARACTERS.test(ranges)
 					error = new Error("null bytes found in ranges")
 					logger.error err: error, doc_id: doc_id, ranges: ranges, error.message
 					return callback(error)

@@ -66,6 +66,23 @@ describe "RedisManager", ->
 	afterEach ->
 		tk.reset()
 
+	describe 'HAS_ESCAPED_NULL_CHARACTER', ->
+		beforeEach ->
+			@testAsJSON = (value) =>
+				@RedisManager.HAS_ESCAPED_NULL_CHARACTERS.test(JSON.stringify(value))
+
+		it 'should detect the first char', ->
+			@testAsJSON('\u0000').should.equal true
+
+		it 'should detect the second char', ->
+			@testAsJSON('_\u0000').should.equal true
+
+		it 'should not detect the first escaped char', ->
+			@testAsJSON('\\u0000').should.equal false
+
+		it 'should not detect the second escaped char', ->
+			@testAsJSON('_\\u0000').should.equal false
+
 	describe "getDoc", ->
 		beforeEach ->
 			@lines = ["one", "two", "three", "これは"] # include some utf8
@@ -530,18 +547,15 @@ describe "RedisManager", ->
 		describe "with null bytes in the serialized doc lines", ->
 			beforeEach ->
 				@RedisManager.getDocVersion.withArgs(@doc_id).yields(null, @version - @ops.length)
-				@_stringify = JSON.stringify
-				@JSON.stringify = () -> return '["bad bytes! \u0000 <- here"]'
+				@lines = ["bad bytes! \u0000 <- here"]
 				@RedisManager.updateDocument @project_id, @doc_id, @lines, @version, @ops, @ranges, @updateMeta, @callback
-
-			afterEach ->
-				@JSON.stringify = @_stringify
 
 			it "should log an error", ->
 				@logger.error.called.should.equal true
 
 			it "should call the callback with an error", ->
 				@callback.calledWith(new Error("null bytes found in doc lines")).should.equal true
+				@callback.firstCall.args[0].message.should.equal "null bytes found in doc lines"
 
 		describe "with ranges that are too big", ->
 			beforeEach ->
@@ -646,18 +660,15 @@ describe "RedisManager", ->
 
 		describe "with null bytes in the serialized doc lines", ->
 			beforeEach ->
-				@_stringify = JSON.stringify
-				@JSON.stringify = () -> return '["bad bytes! \u0000 <- here"]'
+				@lines = ["bad bytes! \u0000 <- here"]
 				@RedisManager.putDocInMemory @project_id, @doc_id, @lines, @version, @ranges, @pathname, @projectHistoryId, @callback
-
-			afterEach ->
-				@JSON.stringify = @_stringify
 
 			it "should log an error", ->
 				@logger.error.called.should.equal true
 
 			it "should call the callback with an error", ->
 				@callback.calledWith(new Error("null bytes found in doc lines")).should.equal true
+				@callback.firstCall.args[0].message.should.equal "null bytes found in doc lines"
 
 		describe "with ranges that are too big", ->
 			beforeEach ->
