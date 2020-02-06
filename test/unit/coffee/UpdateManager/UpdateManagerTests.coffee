@@ -215,13 +215,13 @@ describe "UpdateManager", ->
 				@update = {op: [{p: 42, i: "\uD835\uDC00"}]}
 				@UpdateManager.applyUpdate @project_id, @doc_id, @update, @callback
 
-			it "should apply the update but with surrogate pairs removed", ->
+			it "should apply the update as-is", ->
 				@ShareJsUpdateManager.applyUpdate
 					.calledWith(@project_id, @doc_id, @update)
 					.should.equal true
 
 				# \uFFFD is 'replacement character'
-				@update.op[0].i.should.equal "\uFFFD\uFFFD"
+				@update.op[0].i.should.equal "\uD835\uDC00"
 
 		describe "with an error", ->
 			beforeEach ->
