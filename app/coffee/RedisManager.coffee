@@ -5,6 +5,8 @@ metrics = require('./Metrics')
 Errors = require "./Errors"
 crypto = require "crypto"
 async = require "async"
+snappy = require "snappy"
+
 ProjectHistoryRedisManager = require "./ProjectHistoryRedisManager"
 
 # Sometimes Redis calls take an unexpectedly long time.  We have to be
@@ -47,7 +49,7 @@ module.exports = RedisManager =
 				logger.error {err: error, doc_id, project_id}, error.message
 				return callback(error)
 			multi = rclient.multi()
-			multi.set keys.docLines(doc_id:doc_id), docLines
+			multi.set keys.docLines(doc_id:doc_id), RedisManager._compress(docLines)
 			multi.set keys.projectKey({doc_id:doc_id}), project_id
 			multi.set keys.docVersion(doc_id:doc_id), version
 			multi.set keys.docHash(doc_id:doc_id), docHash
@@ -106,7 +108,7 @@ module.exports = RedisManager =
 	getDoc : (project_id, doc_id, callback = (error, lines, version, ranges, pathname, projectHistoryId, unflushedTime) ->)->
 		timer = new metrics.Timer("redis.get-doc")
 		multi = rclient.multi()
-		multi.get keys.docLines(doc_id:doc_id)
+		multi.getBuffer keys.docLines(doc_id:doc_id)
 		multi.get keys.docVersion(doc_id:doc_id)
 		multi.get keys.docHash(doc_id:doc_id)
 		multi.get keys.projectKey(doc_id:doc_id)
@@ -125,6 +127,7 @@ module.exports = RedisManager =
 			if timeSpan > MAX_REDIS_REQUEST_LENGTH
 				error = new Error("redis getDoc exceeded timeout")
 				return callback(error)
+			docLines = RedisManager._uncompress(docLines)
 			# check sha1 hash value if present
 			if docLines? and storedHash?
 				computedHash = RedisManager._computeHash(docLines)
@@ -251,7 +254,7 @@ module.exports = RedisManager =
 					logger.error err: error, doc_id: doc_id, ranges: ranges, error.message
 					return callback(error)
 				multi = rclient.multi()
-				multi.set    keys.docLines(doc_id:doc_id), newDocLines  # index 0
+				multi.set    keys.docLines(doc_id:doc_id), RedisManager._compress(newDocLines)  # index 0
 				multi.set    keys.docVersion(doc_id:doc_id), newVersion             # index 1
 				multi.set    keys.docHash(doc_id:doc_id), newHash                   # index 2
 				multi.ltrim  keys.docOps(doc_id: doc_id), -RedisManager.DOC_OPS_MAX_LENGTH, -1 # index 3
@@ -363,3 +366,24 @@ module.exports = RedisManager =
 		# note: must specify 'utf8' encoding explicitly, as the default is
 		# binary in node < v5
 		return crypto.createHash('sha1').update(docLines, 'utf8').digest('hex')
+
+	_SNAPPY_PREFIX:  Buffer.from("@snappy:")
+
+	_compress: (docLines) ->
+		if true #Settings.compressDocs and docLines.length > 200
+			x =Buffer.concat([RedisManager._SNAPPY_PREFIX, snappy.compressSync(docLines)])
+			console.log("x",x.toString())
+			return x
+		else
+			return docLines
+
+	_uncompress: (data) ->
+		if !data?
+			return data
+		else if RedisManager._SNAPPY_PREFIX.equals(data.slice(0, RedisManager._SNAPPY_PREFIX.length))
+			return snappy.uncompressSync(data.slice(RedisManager._SNAPPY_PREFIX.length))
+		else if data[0] == 0x5b
+			return data.toString('utf8')
+		else
+			console.error("UNRECOGNISED DATA")
+
