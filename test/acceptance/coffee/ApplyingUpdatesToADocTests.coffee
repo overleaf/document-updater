@@ -169,6 +169,48 @@ describe "Applying updates to a doc", ->
 				done()
 			return null
 
+	describe "with a very large op update_too_large", ->
+		before (done) ->
+			[@project_id, @doc_id] = [DocUpdaterClient.randomId(), DocUpdaterClient.randomId()]
+			blob = "update is too large".repeat(1024 * 400) # >7mb
+			@update.op.push(
+				{
+					p: 0,
+					i: blob + 'this will stay...',
+				},
+				{
+					p: 0,
+					d: blob,
+				}
+			)
+
+			MockWebApi.insertDoc @project_id, @doc_id, {lines: @lines, version: @version, projectHistoryType: 'project-history'}
+			DocUpdaterClient.preloadDoc @project_id, @doc_id, (error) =>
+				throw error if error?
+				DocUpdaterClient.sendUpdate @project_id, @doc_id, @update, (error) ->
+					throw error if error?
+					setTimeout done, 200
+			return null
+
+		it "should not update the doc", (done) ->
+			DocUpdaterClient.getDoc @project_id, @doc_id, (error, res, doc) =>
+				doc.lines.should.deep.equal @result
+				done()
+			return null
+
+		it "should push 0 applied updates to the project history changes api", (done) ->
+			rclient_history.lrange ProjectHistoryKeys.projectHistoryOps({@project_id}), 0, -1, (error, updates) =>
+				updates[0].length.should.equal 0
+				done()
+			return null
+
+		it "should not push the applied updates to the project history changes api", (done) ->
+			rclient_history.lrange ProjectHistoryKeys.projectHistoryOps({@project_id}), 0, -1, (error, updates) =>
+				# do not put an empty array, or this will dump 15mb of data to your terminal
+				JSON.parse(updates[0]).op.should.deep.equal @update.op
+				done()
+			return null
+
 	describe "when the document has been deleted", ->
 		describe "when the ops come in a single linear order", ->
 			before (done) ->
