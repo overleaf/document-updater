@@ -79,6 +79,14 @@ app.get '/status', (req, res)->
 	else
 		res.send('document updater is alive')
 
+app.post '/monitor-redis-pub-sub/enable', (req, res) ->
+	require('./monitorRedisPubSub').enable(req.query.per_channel == 'true')
+	res.send(204)
+
+app.post '/monitor-redis-pub-sub/disable', (req, res) ->
+	require('./monitorRedisPubSub').disable()
+	res.send(204)
+
 pubsubClient = require("redis-sharelatex").createClient(Settings.redis.pubsub)
 app.get "/health_check/redis", (req, res, next) ->
 	pubsubClient.healthCheck (error) ->
