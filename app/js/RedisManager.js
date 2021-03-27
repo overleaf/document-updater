@@ -331,18 +331,6 @@ module.exports = RedisManager = {
     )
   },
 
-  getDocLines(doc_id, callback) {
-    if (callback == null) {
-      callback = function (error, version) {}
-    }
-    return rclient.get(keys.docLines({ doc_id }), function (error, docLines) {
-      if (error != null) {
-        return callback(error)
-      }
-      return callback(null, docLines)
-    })
-  },
-
   getPreviousDocOps(doc_id, start, end, callback) {
     if (callback == null) {
       callback = function (error, jsonOps) {}
