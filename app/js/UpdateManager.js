@@ -220,6 +220,8 @@ module.exports = UpdateManager = {
                 appliedOps,
                 new_ranges,
                 update.meta,
+                pathname,
+                projectHistoryId,
                 function (error, doc_ops_length, project_ops_length) {
                   profile.log('RedisManager.updateDocument')
                   if (error != null) {

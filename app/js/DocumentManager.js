@@ -405,7 +405,9 @@ module.exports = DocumentManager = {
       error,
       lines,
       version,
-      ranges
+      ranges,
+      pathname,
+      projectHistoryId
     ) {
       if (error != null) {
         return callback(error)
@@ -430,6 +432,8 @@ module.exports = DocumentManager = {
           [],
           new_ranges,
           {},
+          pathname,
+          projectHistoryId,
           function (error) {
             if (error != null) {
               return callback(error)
@@ -455,7 +459,9 @@ module.exports = DocumentManager = {
       error,
       lines,
       version,
-      ranges
+      ranges,
+      pathname,
+      projectHistoryId
     ) {
       if (error != null) {
         return callback(error)
@@ -480,6 +486,8 @@ module.exports = DocumentManager = {
           [],
           new_ranges,
           {},
+          pathname,
+          projectHistoryId,
           function (error) {
             if (error != null) {
               return callback(error)

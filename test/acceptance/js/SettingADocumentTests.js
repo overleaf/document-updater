@@ -133,11 +133,12 @@ describe('Setting a document', function () {
 
     it('should leave the document in redis', function (done) {
       docUpdaterRedis.get(
-        Keys.docLines({ doc_id: this.doc_id }),
-        (error, lines) => {
+        Keys.docCore({ doc_id: this.doc_id }),
+        (error, core) => {
           if (error) {
             throw error
           }
+          const lines = core.split('\u0000').shift()
           expect(JSON.parse(lines)).to.deep.equal(this.newLines)
           done()
         }
@@ -197,13 +198,14 @@ describe('Setting a document', function () {
     })
 
     it('should remove the document from redis', function (done) {
-      docUpdaterRedis.get(
-        Keys.docLines({ doc_id: this.doc_id }),
-        (error, lines) => {
+      docUpdaterRedis.exists(
+        Keys.docCore({ doc_id: this.doc_id }),
+        (error, exists) => {
           if (error) {
             throw error
           }
-          expect(lines).to.not.exist
+          // Note: exists returns 0 or 1
+          expect(exists).to.equal(0)
           done()
         }
       )
