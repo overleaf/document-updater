@@ -86,6 +86,18 @@ module.exports = RedisManager = {
     ]
   },
 
+  serializeLastUpdatedCtx(lastUpdatedAt, lastUpdatedBy) {
+    return JSON.stringify({
+      at: lastUpdatedAt,
+      by: lastUpdatedBy || undefined
+    })
+  },
+
+  deserializeLastUpdatedCtx(blob) {
+    const { at: lastUpdatedAt, by: lastUpdatedBy } = JSON.parse(blob || '{}')
+    return { lastUpdatedAt, lastUpdatedBy }
+  },
+
   putDocInMemory(
     project_id,
     doc_id,
@@ -166,8 +178,7 @@ module.exports = RedisManager = {
     multi.del(keys.docVersion({ doc_id }))
     multi.del(keys.projectHistoryType({ doc_id }))
     multi.del(keys.unflushedTime({ doc_id }))
-    multi.del(keys.lastUpdatedAt({ doc_id }))
-    multi.del(keys.lastUpdatedBy({ doc_id }))
+    multi.del(keys.lastUpdatedCtx({ doc_id }))
     return multi.exec(function (error, response) {
       if (error != null) {
         return callback(error)
@@ -231,16 +242,11 @@ module.exports = RedisManager = {
     multi.get(keys.docCore({ doc_id }))
     multi.get(keys.docVersion({ doc_id }))
     multi.get(keys.unflushedTime({ doc_id }))
-    multi.get(keys.lastUpdatedAt({ doc_id }))
-    multi.get(keys.lastUpdatedBy({ doc_id }))
+    multi.get(keys.lastUpdatedCtx({ doc_id }))
     return multi.exec(function (error, ...rest) {
-      let [
-        docCore,
-        version,
-        unflushedTime,
-        lastUpdatedAt,
-        lastUpdatedBy
-      ] = Array.from(rest[0])
+      let [docCore, version, unflushedTime, lastUpdatedCtx] = Array.from(
+        rest[0]
+      )
       const timeSpan = timer.done()
       if (error != null) {
         return callback(error)
@@ -264,6 +270,10 @@ module.exports = RedisManager = {
         pathname,
         projectHistoryId
       ] = RedisManager.deserializeDocCore(docCore)
+      const {
+        lastUpdatedAt,
+        lastUpdatedBy
+      } = RedisManager.deserializeLastUpdatedCtx(lastUpdatedCtx)
 
       // record bytes loaded from redis
       if (docLines != null) {
@@ -569,12 +579,13 @@ module.exports = RedisManager = {
           // hasn't been modified before (the content in mongo has been
           // valid up to this point). Otherwise leave it alone ("NX" flag).
           multi.set(keys.unflushedTime({ doc_id }), Date.now(), 'NX')
-          multi.set(keys.lastUpdatedAt({ doc_id }), Date.now()) // index 8
-          if (updateMeta != null ? updateMeta.user_id : undefined) {
-            multi.set(keys.lastUpdatedBy({ doc_id }), updateMeta.user_id) // index 9
-          } else {
-            multi.del(keys.lastUpdatedBy({ doc_id })) // index 9
-          }
+          multi.set(
+            keys.lastUpdatedCtx({ doc_id }),
+            RedisManager.serializeLastUpdatedCtx(
+              Date.now(),
+              updateMeta && updateMeta.user_id
+            )
+          )
         }
         return multi.exec(function (error, result) {
           let docUpdateCount
@@ -684,7 +695,14 @@ module.exports = RedisManager = {
     }
     return async.mapSeries(
       doc_ids,
-      (doc_id, cb) => rclient.get(keys.lastUpdatedAt({ doc_id }), cb),
+      (doc_id, cb) => {
+        rclient.get(keys.lastUpdatedCtx({ doc_id }), (err, blob) => {
+          if (err || !blob) return cb(err)
+
+          const { lastUpdatedAt } = RedisManager.deserializeLastUpdatedCtx(blob)
+          cb(null, lastUpdatedAt)
+        })
+      },
       callback
     )
   },

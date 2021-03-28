@@ -92,6 +92,9 @@ describe('RedisManager', function () {
                 unflushedTime({ doc_id }) {
                   return `UnflushedTime:${doc_id}`
                 },
+                lastUpdatedCtx({ doc_id }) {
+                  return `lastUpdatedCtx:${doc_id}`
+                },
                 lastUpdatedBy({ doc_id }) {
                   return `lastUpdatedBy:${doc_id}`
                 },
@@ -204,15 +207,9 @@ describe('RedisManager', function () {
           .should.equal(true)
       })
 
-      it('should get lastUpdatedAt', function () {
-        return this.multi.get
-          .calledWith(`lastUpdatedAt:${this.doc_id}`)
-          .should.equal(true)
-      })
-
-      it('should get lastUpdatedBy', function () {
-        return this.multi.get
-          .calledWith(`lastUpdatedBy:${this.doc_id}`)
+      it('should get lastUpdatedCtx', function () {
+        this.multi.get
+          .calledWith(`lastUpdatedCtx:${this.doc_id}`)
           .should.equal(true)
       })
 
@@ -675,15 +672,15 @@ describe('RedisManager', function () {
             .should.equal(true)
         })
 
-        it('should set the last updated time', function () {
-          return this.multi.set
-            .calledWith(`lastUpdatedAt:${this.doc_id}`, Date.now())
-            .should.equal(true)
-        })
-
-        it('should set the last updater', function () {
-          return this.multi.set
-            .calledWith(`lastUpdatedBy:${this.doc_id}`, 'last-author-fake-id')
+        it('should set the last updated details', function () {
+          this.multi.set
+            .calledWith(
+              `lastUpdatedCtx:${this.doc_id}`,
+              JSON.stringify({
+                at: Date.now(),
+                by: 'last-author-fake-id'
+              })
+            )
             .should.equal(true)
         })
 
@@ -1016,15 +1013,15 @@ describe('RedisManager', function () {
         )
       })
 
-      it('should set the last updater to null', function () {
-        return this.multi.del
-          .calledWith(`lastUpdatedBy:${this.doc_id}`)
-          .should.equal(true)
-      })
-
-      return it('should still set the last updated time', function () {
-        return this.multi.set
-          .calledWith(`lastUpdatedAt:${this.doc_id}`, Date.now())
+      it('should set the last updated details with empty author', function () {
+        this.multi.set
+          .calledWith(
+            `lastUpdatedCtx:${this.doc_id}`,
+            JSON.stringify({
+              at: Date.now(),
+              by: undefined
+            })
+          )
           .should.equal(true)
       })
     })
@@ -1224,15 +1221,9 @@ describe('RedisManager', function () {
         .should.equal(true)
     })
 
-    it('should delete lastUpdatedAt', function () {
-      return this.multi.del
-        .calledWith(`lastUpdatedAt:${this.doc_id}`)
-        .should.equal(true)
-    })
-
-    return it('should delete lastUpdatedBy', function () {
-      return this.multi.del
-        .calledWith(`lastUpdatedBy:${this.doc_id}`)
+    it('should delete lastUpdatedCtx', function () {
+      this.multi.del
+        .calledWith(`lastUpdatedCtx:${this.doc_id}`)
         .should.equal(true)
     })
   })
