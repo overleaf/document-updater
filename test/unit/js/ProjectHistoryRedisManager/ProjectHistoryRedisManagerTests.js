@@ -69,7 +69,7 @@ describe('ProjectHistoryRedisManager', function () {
       this.multi = { exec: sinon.stub() }
       this.multi.rpush = sinon.stub()
       this.multi.setnx = sinon.stub()
-      this.rclient.multi = () => this.multi
+      this.rclient.pipeline = () => this.multi
       // @rclient = multi: () => @multi
       return this.ProjectHistoryRedisManager.queueOps(
         this.project_id,

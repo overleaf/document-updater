@@ -35,24 +35,30 @@ module.exports = ProjectHistoryRedisManager = {
     for (const op of Array.from(ops)) {
       metrics.summary('redis.projectHistoryOps', op.length, { status: 'push' })
     }
-    const multi = rclient.multi()
-    // Push the ops onto the project history queue
-    multi.rpush(
-      projectHistoryKeys.projectHistoryOps({ project_id }),
-      ...Array.from(ops)
-    )
+    // PERF: It is OK to use a pipeline here as there are no consistency
+    //        requirements for the timestamp and details of the first entry in
+    //        the queue.
+    //       The first op timestamp is merely used for flushing old projects.
+    const pipeline = rclient.pipeline()
     // To record the age of the oldest op on the queue set a timestamp if not
     // already present (SETNX).
-    multi.setnx(
+    pipeline.setnx(
       projectHistoryKeys.projectHistoryFirstOpTimestamp({ project_id }),
       Date.now()
     )
-    return multi.exec(function (error, result) {
+    // Push the ops onto the project history queue
+    pipeline.rpush(
+      projectHistoryKeys.projectHistoryOps({ project_id }),
+      ...Array.from(ops)
+    )
+    pipeline.exec(function (error, result) {
       if (error != null) {
         return callback(error)
       }
       // return the number of entries pushed onto the project history queue
-      return callback(null, result[0])
+      // NOTE: ioredis duplicates the global error into the command results
+      const [rpushError, projectOpsLength] = result[1]
+      callback(rpushError, projectOpsLength)
     })
   },
 
