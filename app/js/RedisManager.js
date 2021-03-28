@@ -137,20 +137,20 @@ module.exports = RedisManager = {
       rclient.sadd(keys.docsInProject({ project_id }), doc_id, (error) => {
         if (error) return callback(error)
 
-        const multi = rclient.multi()
-        multi.set(
-          keys.docCore({ doc_id }),
-          RedisManager.serializeDocCore(
-            docLines,
-            docHash,
-            ranges,
-            project_id,
-            pathname,
-            projectHistoryId
-          )
+        rclient.mset(
+          {
+            [keys.docCore({ doc_id })]: RedisManager.serializeDocCore(
+              docLines,
+              docHash,
+              ranges,
+              project_id,
+              pathname,
+              projectHistoryId
+            ),
+            [keys.docVersion({ doc_id })]: version
+          },
+          callback
         )
-        multi.set(keys.docVersion({ doc_id }), version)
-        multi.exec(callback)
       })
     })
   },
@@ -169,11 +169,13 @@ module.exports = RedisManager = {
 
     const multi = rclient.multi()
     multi.get(keys.docCore({ doc_id }))
-    multi.del(keys.docCore({ doc_id }))
-    multi.del(keys.docVersion({ doc_id }))
-    multi.del(keys.projectHistoryType({ doc_id }))
-    multi.del(keys.unflushedTime({ doc_id }))
-    multi.del(keys.lastUpdatedCtx({ doc_id }))
+    multi.del(
+      keys.docCore({ doc_id }),
+      keys.docVersion({ doc_id }),
+      keys.projectHistoryType({ doc_id }),
+      keys.unflushedTime({ doc_id }),
+      keys.lastUpdatedCtx({ doc_id })
+    )
     return multi.exec(function (error, response) {
       if (error != null) {
         return callback(error)
@@ -233,12 +235,13 @@ module.exports = RedisManager = {
       ) {}
     }
     const timer = new metrics.Timer('redis.get-doc')
-    const multi = rclient.multi()
-    multi.get(keys.docCore({ doc_id }))
-    multi.get(keys.docVersion({ doc_id }))
-    multi.get(keys.unflushedTime({ doc_id }))
-    multi.get(keys.lastUpdatedCtx({ doc_id }))
-    return multi.exec(function (error, ...rest) {
+    const _keys = [
+      keys.docCore({ doc_id }),
+      keys.docVersion({ doc_id }),
+      keys.unflushedTime({ doc_id }),
+      keys.lastUpdatedCtx({ doc_id })
+    ]
+    rclient.mget(..._keys, function (error, ...rest) {
       let [docCore, version, unflushedTime, lastUpdatedCtx] = Array.from(
         rest[0]
       )
@@ -518,18 +521,23 @@ module.exports = RedisManager = {
           return callback(error)
         }
         const multi = rclient.multi()
-        multi.set(
-          keys.docCore({ doc_id }),
-          RedisManager.serializeDocCore(
+        multi.mset({
+          [keys.docCore({ doc_id })]: RedisManager.serializeDocCore(
             newDocLines,
             newHash,
             ranges,
             project_id,
             pathname,
             projectHistoryId
+          ),
+          [keys.docVersion({ doc_id })]: newVersion,
+          [keys.lastUpdatedCtx({
+            doc_id
+          })]: RedisManager.serializeLastUpdatedCtx(
+            Date.now(),
+            updateMeta && updateMeta.user_id
           )
-        )
-        multi.set(keys.docVersion({ doc_id }), newVersion) // index 1
+        })
         multi.ltrim(
           keys.docOps({ doc_id }),
           -RedisManager.DOC_OPS_MAX_LENGTH,
@@ -558,13 +566,6 @@ module.exports = RedisManager = {
           // hasn't been modified before (the content in mongo has been
           // valid up to this point). Otherwise leave it alone ("NX" flag).
           multi.set(keys.unflushedTime({ doc_id }), Date.now(), 'NX')
-          multi.set(
-            keys.lastUpdatedCtx({ doc_id }),
-            RedisManager.serializeLastUpdatedCtx(
-              Date.now(),
-              updateMeta && updateMeta.user_id
-            )
-          )
         }
         return multi.exec(function (error, result) {
           let docUpdateCount
@@ -576,7 +577,7 @@ module.exports = RedisManager = {
             docUpdateCount = undefined // only using project history, don't bother with track-changes
           } else {
             // project is using old track-changes history service
-            docUpdateCount = result[5]
+            docUpdateCount = result[4]
           }
 
           if (
