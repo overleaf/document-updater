@@ -133,29 +133,24 @@ module.exports = RedisManager = {
         logger.error({ err: error, doc_id, project_id }, error.message)
         return callback(error)
       }
-      const multi = rclient.multi()
-      multi.set(
-        keys.docCore({ doc_id }),
-        RedisManager.serializeDocCore(
-          docLines,
-          docHash,
-          ranges,
-          project_id,
-          pathname,
-          projectHistoryId
+      // update docsInProject set before writing doc contents
+      rclient.sadd(keys.docsInProject({ project_id }), doc_id, (error) => {
+        if (error) return callback(error)
+
+        const multi = rclient.multi()
+        multi.set(
+          keys.docCore({ doc_id }),
+          RedisManager.serializeDocCore(
+            docLines,
+            docHash,
+            ranges,
+            project_id,
+            pathname,
+            projectHistoryId
+          )
         )
-      )
-      multi.set(keys.docVersion({ doc_id }), version)
-      return multi.exec(function (error, result) {
-        if (error != null) {
-          return callback(error)
-        }
-        // update docsInProject set
-        return rclient.sadd(
-          keys.docsInProject({ project_id }),
-          doc_id,
-          callback
-        )
+        multi.set(keys.docVersion({ doc_id }), version)
+        multi.exec(callback)
       })
     })
   },
@@ -314,33 +309,17 @@ module.exports = RedisManager = {
         return callback(new Errors.NotFoundError('document not found'))
       }
 
-      // doc should be in project set, check if missing (workaround for missing docs from putDoc)
-      return rclient.sadd(keys.docsInProject({ project_id }), doc_id, function (
-        error,
-        result
-      ) {
-        if (error != null) {
-          return callback(error)
-        }
-        if (result !== 0) {
-          // doc should already be in set
-          logger.error(
-            { project_id, doc_id, doc_project_id },
-            'doc missing from docsInProject set'
-          )
-        }
-        return callback(
-          null,
-          docLines,
-          version,
-          ranges,
-          pathname,
-          projectHistoryId,
-          unflushedTime,
-          lastUpdatedAt,
-          lastUpdatedBy
-        )
-      })
+      callback(
+        null,
+        docLines,
+        version,
+        ranges,
+        pathname,
+        projectHistoryId,
+        unflushedTime,
+        lastUpdatedAt,
+        lastUpdatedBy
+      )
     })
   },
 
